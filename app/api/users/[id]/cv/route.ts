@@ -14,11 +14,13 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       return createApiResponse(false, "Missing file_url")
     }
     // Insert or update CV metadata
-    await sql`
-      INSERT INTO student_cvs (user_id, file_url, uploaded_at)
-      VALUES (${userId}, ${body.file_url}, NOW())
-      ON DUPLICATE KEY UPDATE file_url = VALUES(file_url), uploaded_at = VALUES(uploaded_at)
-    `
+    // Check if CV exists first
+    const existing = await sql`SELECT id FROM student_cvs WHERE user_id = ${userId} LIMIT 1`
+    if (existing.length > 0) {
+      await sql`UPDATE student_cvs SET file_url = ${body.file_url}, uploaded_at = CURRENT_TIMESTAMP WHERE user_id = ${userId}`
+    } else {
+      await sql`INSERT INTO student_cvs (user_id, file_url, uploaded_at) VALUES (${userId}, ${body.file_url}, CURRENT_TIMESTAMP)`
+    }
     return createApiResponse(true, "CV metadata saved successfully")
   } catch (error) {
     return handleApiError(error)

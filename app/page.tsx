@@ -12,14 +12,20 @@ export const revalidate = 300
 
 export default async function Home() {
   // Fetch first 3 faculty for homepage preview
-  const faculty = await sql`
-    SELECT u.first_name, u.last_name, u.email, fp.department, fp.specialization
-    FROM users u
-    JOIN faculty_profiles fp ON u.id = fp.user_id
-    WHERE u.role = 'faculty'
-    ORDER BY fp.department, u.last_name
-    LIMIT 3
-  `
+  let faculty = []
+  try {
+    faculty = await sql`
+      SELECT u.first_name, u.last_name, u.email, fp.department, fp.specialization
+      FROM users u
+      JOIN faculty_profiles fp ON u.id = fp.user_id
+      WHERE u.role = 'faculty'
+      ORDER BY fp.department, u.last_name
+      LIMIT 3
+    `
+  } catch (error) {
+    console.log("No faculty data available yet:", error)
+    faculty = []
+  }
   return (
     <div className="flex min-h-screen flex-col">
       <header className="sticky top-0 z-50 w-full border-b bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">

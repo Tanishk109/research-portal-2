@@ -17,7 +17,7 @@ import { Badge } from "@/components/ui/badge"
 import { Upload, X, Plus, FileText, Award, Save } from "lucide-react"
 import { Progress } from "@/components/ui/progress"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { getCurrentUserProfile, updateStudentProfile, type StudentProfileData } from "@/app/actions/profiles"
+import type { StudentProfileData } from "@/app/actions/profiles"
 import { useToast } from "@/hooks/use-toast"
 
 const StudentDashboardHeader = dynamic(() => import("@/components/student-dashboard-header"), { ssr: false })
@@ -54,8 +54,9 @@ export default function StudentProfilePage() {
   useEffect(() => {
     async function loadProfile() {
       try {
-        const result = await getCurrentUserProfile()
-        if (result.success && result.profile) {
+        const res = await fetch("/api/dashboard/student/profile")
+        const result = await res.json()
+        if (res.ok && result.success && result.profile) {
           setProfileData({
             firstName: result.profile.first_name || "",
             lastName: result.profile.last_name || "",
@@ -92,8 +93,13 @@ export default function StudentProfilePage() {
   const handleSaveProfile = async () => {
     setSaving(true)
     try {
-      const result = await updateStudentProfile(profileData)
-      if (result.success) {
+      const res = await fetch("/api/dashboard/student/profile", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(profileData),
+      })
+      const result = await res.json()
+      if (res.ok && result.success) {
         toast({
           title: "Success",
           description: "Profile updated successfully",
@@ -339,7 +345,9 @@ export default function StudentProfilePage() {
                   </div>
                 </CardContent>
                 <CardFooter className="flex justify-end">
-                  <Button className="bg-primary hover:bg-primary/90">Save Changes</Button>
+                  <Button onClick={handleSaveProfile} disabled={saving} className="bg-primary hover:bg-primary/90">
+                    {saving ? "Saving..." : "Save Changes"}
+                  </Button>
                 </CardFooter>
               </Card>
             </TabsContent>

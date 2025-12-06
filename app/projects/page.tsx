@@ -219,9 +219,9 @@ export default function ProjectsPage() {
                   <CardContent>
                     <p className="text-sm mb-4">{project.description}</p>
                     <div className="flex flex-wrap gap-2">
-                      {project.tags.map((tag, i) => (
+                      {(typeof project.tags === 'string' ? project.tags.split(',') : project.tags || []).map((tag, i) => (
                         <Badge key={i} variant="secondary">
-                          {tag}
+                          {tag.trim()}
                         </Badge>
                       ))}
                     </div>

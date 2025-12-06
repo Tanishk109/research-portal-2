@@ -1,7 +1,5 @@
 import { NextResponse } from "next/server";
-import { getFacultyProjects } from "@/app/actions/projects";
 import { getFacultyApplications } from "@/app/actions/applications";
-import { getRecentLoginActivity } from "@/app/actions/activity";
 import { getCurrentUser } from "@/app/actions/auth";
 
 export async function GET(request: Request) {
@@ -18,25 +16,15 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const limit = Number(searchParams.get("limit")) || 10;
     const offset = Number(searchParams.get("offset")) || 0;
-
-    // Fetch all dashboard data in parallel
-    const [projects, applications, activity] = await Promise.all([
-      getFacultyProjects(),
-      getFacultyApplications(limit, offset),
-      getRecentLoginActivity(5),
-    ]);
-
-    return NextResponse.json({
-      success: true,
-      projects,
-      applications,
-      activity: activity?.activities || [],
-    });
+    const applications = await getFacultyApplications(limit, offset);
+    return NextResponse.json({ success: true, applications });
   } catch (error) {
-    console.error("Error fetching faculty dashboard:", error);
+    console.error("Error fetching faculty applications:", error);
     return NextResponse.json(
-      { success: false, message: "Failed to load dashboard data" },
+      { success: false, message: "Failed to load applications" },
       { status: 500 }
     );
   }
-} 
+}
+
+

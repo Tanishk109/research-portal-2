@@ -2,7 +2,7 @@
 
 import { BarChart as TremorBarChart } from "@tremor/react"
 import { LineChart as TremorLineChart } from "@tremor/react"
-import { PieChart as TremorPieChart } from "@tremor/react"
+import { DonutChart } from "@tremor/react"
 
 interface ChartProps {
   data: any[]
@@ -80,12 +80,13 @@ export function PieChart({ data, index, category, colors }: PieChartProps) {
   }
 
   return (
-    <TremorPieChart
+    <DonutChart
       className="h-full"
       data={data}
       index={index}
       category={category}
       colors={colors}
+      variant="pie"
       showAnimation={true}
       valueFormatter={(value) => `${value}`}
     />

@@ -7,12 +7,14 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Input } from "@/components/ui/input"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useToast } from "@/components/ui/use-toast"
 import { Search, AlertCircle } from "lucide-react"
 import FacultyDashboardHeader from "@/components/faculty-dashboard-header"
-import { getFacultyApplications, updateApplicationStatus } from "@/app/actions/applications"
+// Use API endpoints; avoid importing server actions in client component
 
 export default function FacultyApplicationsPage() {
   const { toast } = useToast()
@@ -20,14 +22,21 @@ export default function FacultyApplicationsPage() {
   const [applications, setApplications] = useState<any[]>([])
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
+  const [projectFilter, setProjectFilter] = useState<string>("all")
+  const [projects, setProjects] = useState<any[]>([])
   const [processingApplicationIds, setProcessingApplicationIds] = useState<number[]>([])
+  const [selectedIds, setSelectedIds] = useState<number[]>([])
+  const [isFeedbackOpen, setIsFeedbackOpen] = useState(false)
+  const [feedbackText, setFeedbackText] = useState("")
+  const [pendingBulkAction, setPendingBulkAction] = useState<null | { type: "approved" | "rejected" }>(null)
 
   useEffect(() => {
     const fetchApplications = async () => {
       try {
         setLoading(true)
-        const data = await getFacultyApplications()
-        setApplications(data || [])
+        const res = await fetch("/api/dashboard/faculty/applications")
+        const json = await res.json()
+        setApplications((res.ok && json.success ? json.applications : []) || [])
       } catch (error) {
         console.error("Error fetching applications:", error)
         toast({
@@ -40,16 +49,31 @@ export default function FacultyApplicationsPage() {
       }
     }
 
+    const fetchProjects = async () => {
+      try {
+        const res = await fetch("/api/dashboard/faculty")
+        const json = await res.json()
+        setProjects((res.ok && json.success ? json.projects : []) || [])
+      } catch (e) {
+        // ignore
+      }
+    }
+
     fetchApplications()
+    fetchProjects()
   }, [toast])
 
   const handleUpdateApplicationStatus = async (id: number, status: "approved" | "rejected", feedback?: string) => {
     try {
       setProcessingApplicationIds((prev) => [...prev, id])
+      const res = await fetch(`/api/dashboard/faculty/applications/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status, feedback }),
+      })
+      const result = await res.json()
 
-      const result = await updateApplicationStatus(id, status, feedback)
-
-      if (result.success) {
+      if (res.ok && result.success) {
         // Update local state
         setApplications((prev) =>
           prev.map((app) => (app.id === id ? { ...app, status, feedback: feedback || app.feedback } : app)),
@@ -86,9 +110,47 @@ export default function FacultyApplicationsPage() {
       application.department.toLowerCase().includes(searchTerm.toLowerCase())
 
     const matchesStatus = statusFilter === "all" || application.status === statusFilter
+    const matchesProject = projectFilter === "all" || String(application.project_id) === projectFilter
 
-    return matchesSearch && matchesStatus
+    return matchesSearch && matchesStatus && matchesProject
   })
+
+  const toggleSelect = (id: number, checked: boolean) => {
+    setSelectedIds((prev) => (checked ? [...prev, id] : prev.filter((x) => x !== id)))
+  }
+
+  const toggleSelectAll = (checked: boolean) => {
+    setSelectedIds(checked ? filteredApplications.map((a) => a.id) : [])
+  }
+
+  const runBulkAction = async (type: "approved" | "rejected", feedback?: string) => {
+    const ids = selectedIds.slice()
+    if (ids.length === 0) return
+    setProcessingApplicationIds((prev) => [...prev, ...ids])
+    try {
+      const results = await Promise.all(
+        ids.map(async (id) => {
+          const res = await fetch(`/api/dashboard/faculty/applications/${id}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ status: type, feedback }),
+          })
+          return res.ok
+        })
+      )
+      const successCount = results.filter(Boolean).length
+      // Update local state
+      setApplications((prev) =>
+        prev.map((app) => (ids.includes(app.id) ? { ...app, status: type, feedback: feedback || app.feedback } : app))
+      )
+      setSelectedIds([])
+      toast({ title: "Done", description: `Updated ${successCount}/${ids.length} application(s).` })
+    } catch (e) {
+      toast({ title: "Error", description: "Failed to run bulk action", variant: "destructive" })
+    } finally {
+      setProcessingApplicationIds((prev) => prev.filter((id) => !ids.includes(id)))
+    }
+  }
 
   return (
     <div className="flex min-h-screen flex-col bg-gray-50">
@@ -110,20 +172,77 @@ export default function FacultyApplicationsPage() {
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-full md:w-[180px]">
-                <SelectValue placeholder="Filter by status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Applications</SelectItem>
-                <SelectItem value="pending">Pending</SelectItem>
-                <SelectItem value="approved">Approved</SelectItem>
-                <SelectItem value="rejected">Rejected</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="flex gap-2 w-full md:w-auto">
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-full md:w-[180px]">
+                  <SelectValue placeholder="Filter by status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Applications</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="approved">Approved</SelectItem>
+                  <SelectItem value="rejected">Rejected</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={projectFilter} onValueChange={setProjectFilter}>
+                <SelectTrigger className="w-full md:w-[220px]">
+                  <SelectValue placeholder="Filter by project" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Projects</SelectItem>
+                  {projects.map((p) => (
+                    <SelectItem key={p.id} value={String(p.id)}>
+                      {p.title}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           <div className="grid gap-4">
+            {filteredApplications.length > 0 && (
+              <Card>
+                <CardHeader className="pb-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <Checkbox
+                        id="select-all"
+                        checked={selectedIds.length === filteredApplications.length}
+                        onCheckedChange={(c) => toggleSelectAll(Boolean(c))}
+                      />
+                      <label htmlFor="select-all" className="text-sm text-muted-foreground">
+                        Select all ({selectedIds.length}/{filteredApplications.length})
+                      </label>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        disabled={selectedIds.length === 0}
+                        onClick={() => {
+                          setPendingBulkAction({ type: "rejected" })
+                          setFeedbackText("Thank you for your interest, but we have selected other candidates.")
+                          setIsFeedbackOpen(true)
+                        }}
+                        className="text-red-600 border-red-600"
+                      >
+                        Bulk Reject
+                      </Button>
+                      <Button
+                        disabled={selectedIds.length === 0}
+                        onClick={() => {
+                          setPendingBulkAction({ type: "approved" })
+                          setFeedbackText("Congratulations! We're excited to have you join our research team.")
+                          setIsFeedbackOpen(true)
+                        }}
+                      >
+                        Bulk Approve
+                      </Button>
+                    </div>
+                  </div>
+                </CardHeader>
+              </Card>
+            )}
             {loading ? (
               Array(3)
                 .fill(0)
@@ -166,6 +285,10 @@ export default function FacultyApplicationsPage() {
                   <CardHeader className="pb-2">
                     <div className="flex justify-between items-start">
                       <div className="flex items-center gap-4">
+                        <Checkbox
+                          checked={selectedIds.includes(application.id)}
+                          onCheckedChange={(c) => toggleSelect(application.id, Boolean(c))}
+                        />
                         <Avatar>
                           <AvatarImage
                             src={`/placeholder.svg?height=40&width=40&text=${application.student_name.charAt(0)}`}
@@ -271,6 +394,45 @@ export default function FacultyApplicationsPage() {
           </div>
         </div>
       </main>
+      <Dialog open={isFeedbackOpen} onOpenChange={setIsFeedbackOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {pendingBulkAction?.type === "approved" ? "Approve" : "Reject"} {selectedIds.length} application(s)
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <label className="text-sm text-muted-foreground">Feedback (optional)</label>
+            <Input
+              placeholder="Write a short feedback message"
+              value={feedbackText}
+              onChange={(e) => setFeedbackText(e.target.value)}
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsFeedbackOpen(false)
+                setPendingBulkAction(null)
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={async () => {
+                if (!pendingBulkAction) return
+                setIsFeedbackOpen(false)
+                await runBulkAction(pendingBulkAction.type, feedbackText)
+                setPendingBulkAction(null)
+                setFeedbackText("")
+              }}
+            >
+              Confirm
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

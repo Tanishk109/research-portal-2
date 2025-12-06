@@ -16,7 +16,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     // Insert certificate metadata
     await sql`
       INSERT INTO student_certificates (user_id, file_url, name, uploaded_at)
-      VALUES (${userId}, ${body.file_url}, ${body.name}, NOW())
+      VALUES (${userId}, ${body.file_url}, ${body.name}, CURRENT_TIMESTAMP)
     `
     return createApiResponse(true, "Certificate metadata saved successfully")
   } catch (error) {

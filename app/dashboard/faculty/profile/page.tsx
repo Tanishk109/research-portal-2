@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { toast } from "sonner"
-import { getCurrentUserProfile, updateFacultyProfile } from "@/app/actions/profiles"
+import { getCurrentUserProfile } from "@/app/actions/profiles"
 import type { FacultyProfileData } from "@/app/actions/profiles"
 import dynamic from "next/dynamic"
 import useSWR from "swr"
@@ -76,9 +76,14 @@ export default function FacultyProfilePage() {
   const handleSave = async () => {
     try {
       setIsSaving(true)
-      const result = await updateFacultyProfile(formData)
+      const res = await fetch("/api/dashboard/faculty/profile", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData),
+      })
+      const result = await res.json()
       
-      if (result.success) {
+      if (res.ok && result.success) {
         toast.success("Profile updated successfully")
         setIsEditing(false)
         await loadProfile() // Reload to get updated data

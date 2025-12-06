@@ -36,15 +36,7 @@ export async function POST(request: NextRequest) {
 
     if (users.length === 0) {
       console.log(`User not found: ${email}`)
-      // Record failed login attempt
-      await sql`
-        INSERT INTO login_activity (
-          user_id, timestamp, ip_address, user_agent, success, device_type
-        ) VALUES (
-          NULL, CURRENT_TIMESTAMP, ${ipAddress || "unknown"}, 
-          ${userAgent || "unknown"}, false, 'Web'
-        )
-      `
+      // Skip logging for non-existent users since user_id cannot be NULL
       return createApiResponse(false, "Invalid email or password", null, 401)
     }
 

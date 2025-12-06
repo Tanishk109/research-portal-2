@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/app/actions/auth";
 import { sql } from "@/lib/db";
+import { updateFacultyProfile } from "@/app/actions/profiles";
 
 export async function GET() {
   try {
@@ -19,6 +20,23 @@ export async function GET() {
     );
     return NextResponse.json({ success: true, profile: profile[0] || null });
   } catch (error) {
-    return NextResponse.json({ success: false, error: (error as Error).message }, { status: 500 });
+    console.error("Error fetching faculty profile:", error);
+    return NextResponse.json(
+      { success: false, message: "Failed to load profile" },
+      { status: 500 }
+    );
   }
 } 
+
+export async function PUT(request: Request) {
+  try {
+    const body = await request.json();
+    const result = await updateFacultyProfile(body);
+    if (!result.success) {
+      return NextResponse.json({ success: false, message: result.message }, { status: 400 });
+    }
+    return NextResponse.json({ success: true, message: result.message });
+  } catch (error) {
+    return NextResponse.json({ success: false, message: "Failed to update profile" }, { status: 500 });
+  }
+}

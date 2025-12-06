@@ -142,7 +142,7 @@ export async function getApplicationAnalytics() {
       SELECT COUNT(*) as count 
       FROM applications a
       JOIN projects p ON a.project_id = p.id
-      WHERE p.faculty_id = ${facultyId} AND a.status = 'approved'
+      WHERE p.faculty_id = ${facultyId} AND a.status = 'accepted'
     `
     const approvedApplications = Number.parseInt(approvedApplicationsResult[0].count)
 
@@ -248,7 +248,7 @@ export async function getApplicationAnalytics() {
         SELECT 
           sp.department,
           COUNT(DISTINCT a.id) as total_applications,
-          COUNT(DISTINCT CASE WHEN a.status = 'approved' THEN a.id END) as approved_applications
+          COUNT(DISTINCT CASE WHEN a.status = 'accepted' THEN a.id END) as approved_applications
         FROM applications a
         JOIN projects p ON a.project_id = p.id
         JOIN student_profiles sp ON a.student_id = sp.id

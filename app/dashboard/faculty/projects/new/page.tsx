@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge"
 import { X } from "lucide-react"
 import FacultyDashboardHeader from "@/components/faculty-dashboard-header"
-import { createProject } from "@/app/actions/projects"
+// Use API instead of importing server action directly in client component
 import { toast } from "sonner"
 
 export default function NewProjectPage() {
@@ -59,8 +59,13 @@ export default function NewProjectPage() {
     }
 
     try {
-      const result = await createProject(data)
-      if (result.success) {
+      const res = await fetch("/api/projects", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      })
+      const result = await res.json()
+      if (res.ok && result.success) {
         toast.success("Project created successfully!")
         router.push("/dashboard/faculty/projects")
       } else {

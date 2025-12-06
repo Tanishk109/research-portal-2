@@ -2,7 +2,7 @@
 
 import { cookies } from "next/headers"
 import { redirect } from "next/navigation"
-import { sql, hashPassword, comparePassword } from "@/lib/db"
+import { sql, hashPassword, comparePassword, getPool } from "@/lib/db"
 import { jwtVerify, SignJWT } from "jose"
 import { nanoid } from "nanoid"
 import { JWT_SECRET, COOKIE_SETTINGS, JWT_EXPIRATION } from "@/lib/env"
@@ -185,88 +185,63 @@ export async function register(formData: FormData) {
     // Hash password
     const hashedPassword = await hashPassword(password)
 
-    // Start a transaction
-    const result = await sql.begin(async (sql) => {
+    // Start a transaction using mysql2/promise
+    const pool = getPool()
+    const connection = await pool.getConnection()
+    try {
+      await connection.beginTransaction()
+      
       // Insert user
-      const user = await sql`
-        INSERT INTO users (
-          role, first_name, last_name, email, password_hash
-        ) VALUES (
-          ${role}, ${firstName}, ${lastName}, ${email}, ${hashedPassword}
-        ) RETURNING id, role, first_name, last_name, email, created_at, updated_at
-      `
+      const [userResult] = await connection.query(
+        `INSERT INTO users (role, first_name, last_name, email, password_hash) VALUES (?, ?, ?, ?, ?)`,
+        [role, firstName, lastName, email, hashedPassword]
+      )
+      // @ts-ignore
+      const userId = userResult.insertId
 
       // Insert role-specific profile
       if (role === "faculty") {
-        await sql`
-          INSERT INTO faculty_profiles (
-            user_id, faculty_id, department, specialization, date_of_joining, date_of_birth
-          ) VALUES (
-            ${user[0].id}, ${facultyId}, ${department}, ${specialization}, 
-            ${dateOfJoining}, ${dateOfBirth}
-          )
-        `
+        await connection.query(
+          `INSERT INTO faculty_profiles (user_id, faculty_id, department, specialization, date_of_joining, date_of_birth) VALUES (?, ?, ?, ?, ?, ?)`,
+          [userId, facultyId, department, specialization, dateOfJoining, dateOfBirth]
+        )
       } else if (role === "student") {
-        await sql`
-          INSERT INTO student_profiles (
-            user_id, registration_number, department, year, cgpa
-          ) VALUES (
-            ${user[0].id}, ${registrationNumber}, ${department}, ${year}, ${Number.parseFloat(cgpa)}
-          )
-        `
+        await connection.query(
+          `INSERT INTO student_profiles (user_id, registration_number, department, year, cgpa) VALUES (?, ?, ?, ?, ?)`,
+          [userId, registrationNumber, department, year, Number.parseFloat(cgpa)]
+        )
       }
 
       // Get user agent details
       const { deviceType } = getUserAgentDetails(userAgent)
 
       // Record successful registration as a login
-      await sql`
-        INSERT INTO login_activity (
-          user_id, timestamp, ip_address, user_agent, success, device_type
-        ) VALUES (
-          ${user[0].id}, CURRENT_TIMESTAMP, ${ipAddress}, ${userAgent}, true, ${deviceType}
-        )
+      await connection.query(
+        `INSERT INTO login_activity (user_id, timestamp, ip_address, user_agent, success, device_type) VALUES (?, CURRENT_TIMESTAMP, ?, ?, true, ?)`,
+        [userId, ipAddress, userAgent, deviceType]
+      )
+
+      await connection.commit()
+      connection.release()
+      
+      // Get the created user data
+      const [userData] = await sql`
+        SELECT id, role, first_name, last_name, email, created_at, updated_at
+        FROM users WHERE id = ${userId}
       `
-
-      return user[0]
-    })
-
-    console.log(`Registration successful for user: ${result.id}`)
-
-    // Create JWT token
-    const token = await new SignJWT({
-      id: result.id,
-      role: result.role,
-      email: result.email,
-      name: `${result.first_name} ${result.last_name}`,
-    })
-      .setProtectedHeader({ alg: "HS256" })
-      .setJti(nanoid())
-      .setIssuedAt()
-      .setExpirationTime(JWT_EXPIRATION)
-      .sign(new TextEncoder().encode(JWT_SECRET))
-
-    // Set cookie
-    cookies().set("session", token, COOKIE_SETTINGS)
-
-    return {
-      success: true,
-      message: "Registration successful",
-      user: {
-        id: result.id,
-        role: result.role,
-        name: `${result.first_name} ${result.last_name}`,
-        email: result.email,
-      },
+      
+      return userData[0]
+    } catch (err) {
+      await connection.rollback()
+      connection.release()
+      throw err
     }
   } catch (error) {
     console.error("Registration error:", error)
-    return {
-      success: false,
-      message: `Registration failed: ${error instanceof Error ? error.message : String(error)}`,
-    }
+    return { success: false, message: "Registration failed" }
   }
 }
+
 
 // Register faculty
 export async function registerFaculty(data: any) {

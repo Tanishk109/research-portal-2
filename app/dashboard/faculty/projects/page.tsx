@@ -211,9 +211,9 @@ export default function FacultyProjectsPage() {
                       </CardHeader>
                       <CardContent>
                         <div className="flex flex-wrap gap-2 mb-4">
-                          {project.tags.map((tag: string, i: number) => (
+                          {(typeof project.tags === 'string' ? project.tags.split(',') : project.tags || []).map((tag: string, i: number) => (
                             <Badge key={i} variant="outline" className="border-primary text-primary">
-                              {tag}
+                              {tag.trim()}
                             </Badge>
                           ))}
                         </div>

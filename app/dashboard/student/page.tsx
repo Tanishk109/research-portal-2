@@ -9,8 +9,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { FileText, Search, Filter, Calendar } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import Link from "next/link"
-import { getActiveProjects } from "@/app/actions/projects"
-import { getStudentApplications } from "@/app/actions/applications"
+// Fetch via API endpoints to avoid importing server actions in client component
 import { toast } from "@/components/ui/use-toast"
 import { Skeleton } from "@/components/ui/skeleton"
 import RecentLoginActivity from "@/components/recent-login-activity"
@@ -39,10 +38,14 @@ export default function StudentDashboard() {
         setLoadingProjects(true)
         setLoadingApplications(true)
         
-        const [projectsData, applicationsData] = await Promise.all([
-          getActiveProjects(),
-          getStudentApplications()
+        const [projectsRes, applicationsRes] = await Promise.all([
+          fetch("/api/projects/active"),
+          fetch("/api/dashboard/student"),
         ])
+        const projectsJson = await projectsRes.json()
+        const applicationsJson = await applicationsRes.json()
+        const projectsData = projectsRes.ok && projectsJson.success ? projectsJson.projects : []
+        const applicationsData = applicationsRes.ok && applicationsJson.success ? applicationsJson.applications : []
         
         setProjects(projectsData)
         setApplications(applicationsData)
@@ -251,9 +254,9 @@ export default function StudentDashboard() {
                             <p className="text-sm mb-4">{project.description}</p>
                             <div className="flex flex-wrap gap-2">
                               {project.tags &&
-                                project.tags.map((tag: string, i: number) => (
+                                (typeof project.tags === 'string' ? project.tags.split(',') : project.tags || []).map((tag: string, i: number) => (
                                   <Badge key={i} variant="secondary" className="bg-[#0c2461]/10 text-[#0c2461]">
-                                    {tag}
+                                    {tag.trim()}
                                   </Badge>
                                 ))}
                             </div>

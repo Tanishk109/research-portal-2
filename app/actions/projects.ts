@@ -114,7 +114,7 @@ export async function getActiveProjects() {
       JOIN faculty_profiles fp ON p.faculty_id = fp.id
       JOIN users u ON fp.user_id = u.id
       LEFT JOIN project_tags pt ON p.id = pt.project_id
-      WHERE p.status = 'active' AND p.deadline >= CURRENT_DATE
+      WHERE p.status = 'active' AND (p.deadline IS NULL OR p.deadline >= CURRENT_DATE)
       GROUP BY p.id, u.first_name, u.last_name, fp.department
       ORDER BY p.created_at DESC
     `
@@ -446,7 +446,7 @@ export async function deleteProject(id: number) {
     // Check if there are any approved applications
     const approvedApplications = await sql`
       SELECT id FROM applications 
-      WHERE project_id = ${id} AND status = 'approved'
+      WHERE project_id = ${id} AND status = 'accepted'
     `
 
     if (approvedApplications.length > 0) {

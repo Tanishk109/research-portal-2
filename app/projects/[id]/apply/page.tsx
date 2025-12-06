@@ -4,7 +4,6 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { BookOpen, ArrowLeft } from "lucide-react"
-import { getProjectById } from "@/app/actions/projects"
 import { ApplicationForm } from "@/components/application-form"
 import { toast } from "@/components/ui/use-toast"
 
@@ -23,13 +22,20 @@ export default function ApplyProjectPage({ params }: { params: { id: string } })
           return
         }
 
-        const projectData = await getProjectById(projectId)
-        if (!projectData) {
+        const res = await fetch(`/api/projects/${projectId}`)
+        const result = await res.json()
+        
+        if (!res.ok || !result.success || !result.project) {
+          toast({
+            title: "Error",
+            description: result.message || "Failed to load project details",
+            variant: "destructive",
+          })
           router.push("/projects")
           return
         }
 
-        setProject(projectData)
+        setProject(result.project)
       } catch (error) {
         console.error("Error fetching project:", error)
         toast({
@@ -37,6 +43,7 @@ export default function ApplyProjectPage({ params }: { params: { id: string } })
           description: "Failed to load project details",
           variant: "destructive",
         })
+        router.push("/projects")
       } finally {
         setLoading(false)
       }

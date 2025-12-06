@@ -91,9 +91,9 @@ export default async function ProjectDetailPage({ params }: { params: { id: stri
                 <CardContent className="space-y-4">
                   <p>{project.description}</p>
                   <div className="flex flex-wrap gap-2 pt-2">
-                    {project.tags.map((tag, i) => (
+                    {(typeof project.tags === 'string' ? project.tags.split(',') : project.tags || []).map((tag, i) => (
                       <Badge key={i} variant="secondary">
-                        {tag}
+                        {tag.trim()}
                       </Badge>
                     ))}
                   </div>

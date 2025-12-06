@@ -12,39 +12,6 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { useToast } from "@/components/ui/use-toast"
 import { ArrowLeft, Calendar, FileText, GraduationCap, User } from "lucide-react"
 import FacultyDashboardHeader from "@/components/faculty-dashboard-header"
-import { updateApplicationStatus } from "@/app/actions/applications"
-
-// This would be a server action to get application details
-async function getApplicationDetails(id: number) {
-  // In a real implementation, this would be a server action
-  // For now, we'll simulate a delay and return mock data
-  await new Promise((resolve) => setTimeout(resolve, 1000))
-
-  // This is a placeholder - in a real implementation, you would fetch from the database
-  return {
-    id,
-    status: "pending",
-    message:
-      "I am very interested in this project as it aligns perfectly with my academic interests and career goals. I have completed several courses related to this field and have hands-on experience with similar projects during my internship last summer. I am particularly fascinated by the research methodology described and believe I can contribute significantly to the project outcomes. I am proficient in the required technical skills and am eager to expand my knowledge in this domain. I am committed to dedicating the necessary time and effort to ensure the success of this research project.",
-    applied_at: new Date().toISOString(),
-    project: {
-      id: 1,
-      title: "Deep Learning for Medical Image Analysis",
-      description: "Developing deep learning models for medical image analysis to aid in disease diagnosis.",
-      research_area: "Artificial Intelligence",
-      positions: 3,
-      deadline: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-    },
-    student: {
-      id: 1,
-      name: "Rahul Verma",
-      registration_number: "190905001",
-      department: "Computer Science",
-      year: "3rd Year",
-      cgpa: 8.7,
-    },
-  }
-}
 
 export default function ApplicationDetailsPage({ params }: { params: { id: string } }) {
   const id = Number.parseInt(params.id)
@@ -59,9 +26,43 @@ export default function ApplicationDetailsPage({ params }: { params: { id: strin
     const fetchData = async () => {
       try {
         setLoading(true)
-        const data = await getApplicationDetails(id)
-        setApplication(data)
-        setFeedback(data.feedback || "")
+        const res = await fetch(`/api/dashboard/faculty/applications/${id}`)
+        const result = await res.json()
+        
+        if (!res.ok || !result.success || !result.application) {
+          toast({
+            title: "Error",
+            description: result.message || "Failed to load application details. Please try again.",
+            variant: "destructive",
+          })
+          return
+        }
+
+        const app = result.application
+        // Map status from "accepted" to "approved" for frontend
+        const mappedApp = {
+          ...app,
+          status: app.status === "accepted" ? "approved" : app.status,
+          project: {
+            id: app.project_id,
+            title: app.project_title,
+            description: "",
+            research_area: "",
+            positions: 0,
+            deadline: "",
+          },
+          student: {
+            id: app.student_id,
+            name: app.student_name,
+            registration_number: app.registration_number,
+            department: app.department,
+            year: app.year || "",
+            cgpa: app.cgpa,
+          },
+        }
+        
+        setApplication(mappedApp)
+        setFeedback(app.feedback || "")
       } catch (error) {
         console.error("Error fetching application details:", error)
         toast({
@@ -74,16 +75,24 @@ export default function ApplicationDetailsPage({ params }: { params: { id: strin
       }
     }
 
-    fetchData()
+    if (id) {
+      fetchData()
+    }
   }, [id, toast])
 
   const handleUpdateStatus = async (status: "approved" | "rejected") => {
     try {
       setProcessing(true)
 
-      const result = await updateApplicationStatus(id, status, feedback)
+      const res = await fetch(`/api/dashboard/faculty/applications/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status, feedback }),
+      })
 
-      if (result.success) {
+      const result = await res.json()
+
+      if (res.ok && result.success) {
         toast({
           title: "Success",
           description: `Application ${status === "approved" ? "approved" : "rejected"} successfully.`,
@@ -94,7 +103,7 @@ export default function ApplicationDetailsPage({ params }: { params: { id: strin
 
         // Redirect after a short delay
         setTimeout(() => {
-          router.push("/dashboard/faculty")
+          router.push("/dashboard/faculty/applications")
         }, 1500)
       } else {
         toast({
@@ -259,7 +268,7 @@ export default function ApplicationDetailsPage({ params }: { params: { id: strin
                   disabled={application.status !== "pending" || processing}
                 />
               </CardContent>
-              {application.status === "pending" && (
+              {(application.status === "pending" || application.status === "Pending") && (
                 <CardFooter className="flex justify-end gap-4">
                   <Button
                     variant="outline"
