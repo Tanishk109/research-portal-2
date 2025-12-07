@@ -1,17 +1,21 @@
 import type { NextRequest } from "next/server"
-import { sql } from "@/lib/db"
+import { connectToMongoDB } from "@/lib/mongodb"
+import { LoginActivity, User } from "@/lib/models"
 import { createApiResponse, handleApiError } from "@/lib/api-utils"
 import { cache } from '@/lib/cache'
+import { toObjectId, toPlainObject } from "@/lib/db"
 
 // GET /api/login-activity - Get login activity
 export async function GET(request: NextRequest) {
   try {
+    await connectToMongoDB()
     // Get query parameters
     const { searchParams } = new URL(request.url)
     const userId = searchParams.get("userId")
     const limit = Number.parseInt(searchParams.get("limit") || "100")
     const offset = Number.parseInt(searchParams.get("offset") || "0")
     const success = searchParams.get("success")
+    
     // Cache key based on params
     const cacheKey = `login-activity:list:${userId || 'all'}:${success || 'all'}:${limit}:${offset}`
     const cacheCountKey = `login-activity:count:${userId || 'all'}:${success || 'all'}`
@@ -28,58 +32,79 @@ export async function GET(request: NextRequest) {
       }, "Login activity retrieved successfully (cached)")
     }
 
-    // Base query
-    let query = `
-      SELECT 
-        la.id, la.user_id, la.timestamp, la.ip_address, la.user_agent, 
-        la.success, la.location, la.device_type,
-        u.first_name, u.last_name, u.email, u.role
-      FROM 
-        login_activity la
-      JOIN
-        users u ON la.user_id = u.id
-    `
+    // Build aggregation pipeline
+    const pipeline: any[] = [
+      {
+        $lookup: {
+          from: "users",
+          localField: "user_id",
+          foreignField: "_id",
+          as: "user",
+        },
+      },
+      { $unwind: "$user" },
+    ]
 
     // Add filters
-    const conditions = []
-
+    const matchStage: any = {}
     if (userId) {
-      conditions.push(`la.user_id = ${Number.parseInt(userId)}`)
+      const userIdObj = toObjectId(userId)
+      if (userIdObj) {
+        matchStage.user_id = userIdObj
+      }
     }
-
     if (success !== null) {
-      conditions.push(`la.success = ${success === "true"}`)
+      matchStage.success = success === "true"
+    }
+    if (Object.keys(matchStage).length > 0) {
+      pipeline.push({ $match: matchStage })
     }
 
-    if (conditions.length > 0) {
-      query += ` WHERE ${conditions.join(" AND ")}`
-    }
+    // Add projection
+    pipeline.push({
+      $project: {
+        id: { $toString: "$_id" },
+        user_id: { $toString: "$user_id" },
+        timestamp: 1,
+        ip_address: 1,
+        user_agent: 1,
+        success: 1,
+        location: 1,
+        device_type: 1,
+        first_name: "$user.first_name",
+        last_name: "$user.last_name",
+        email: "$user.email",
+        role: "$user.role",
+      },
+    })
 
-    // Add pagination
-    query += ` ORDER BY la.timestamp DESC LIMIT ${limit} OFFSET ${offset}`
+    // Add sorting and pagination
+    pipeline.push({ $sort: { timestamp: -1 } })
+    pipeline.push({ $skip: offset })
+    pipeline.push({ $limit: limit })
 
     // Execute query
-    const activities = await sql.unsafe(query)
+    const activities = await LoginActivity.aggregate(pipeline)
 
-    // Get total count for pagination
-    let countQuery = `
-      SELECT COUNT(*) as total FROM login_activity la
-    `
-
-    if (conditions.length > 0) {
-      countQuery += ` WHERE ${conditions.join(" AND ")}`
+    // Get total count
+    const countPipeline: any[] = []
+    if (Object.keys(matchStage).length > 0) {
+      countPipeline.push({ $match: matchStage })
     }
+    countPipeline.push({ $count: "total" })
+    const countResult = await LoginActivity.aggregate(countPipeline)
+    const total = countResult.length > 0 ? countResult[0].total : 0
 
-    const countResult = await sql.unsafe(countQuery)
+    const activitiesPlain = activities.map(toPlainObject)
 
     // Set cache for 30 seconds
-    cache.set(cacheKey, activities, 30)
-    cache.set(cacheCountKey, Number.parseInt(countResult[0].total), 30)
+    cache.set(cacheKey, activitiesPlain, 30)
+    cache.set(cacheCountKey, total, 30)
 
     return createApiResponse(true, {
-      activities,
+      activities: activitiesPlain,
       pagination: {
-        total: Number.parseInt(countResult[0].total),
+        total,
         limit,
         offset,
       },

@@ -1,13 +1,17 @@
 import { NextResponse } from "next/server";
 import { updateApplicationStatus } from "@/app/actions/applications";
+import { connectToMongoDB } from "@/lib/mongodb";
+import { Application, Project, FacultyProfile, StudentProfile, User } from "@/lib/models";
+import { toObjectId, toPlainObject } from "@/lib/db";
 
 export async function GET(
   request: Request,
   { params }: { params: { id: string } }
 ) {
   try {
-    const id = Number.parseInt(params.id);
-    if (isNaN(id) || id <= 0) {
+    await connectToMongoDB();
+    const id = toObjectId(params.id);
+    if (!id) {
       return NextResponse.json(
         { success: false, message: "Invalid application ID" },
         { status: 400 }
@@ -25,24 +29,82 @@ export async function GET(
       );
     }
 
-    // Efficiently fetch single application with all details
-    const { sql } = await import("@/lib/db");
-    const applications = await sql.unsafe(`
-      SELECT 
-        a.id, a.status, a.cover_letter as message, a.feedback, a.applied_at,
-        p.id as project_id, p.title as project_title, p.description as project_description,
-        p.research_area, p.positions, p.deadline, p.start_date,
-        s.id as student_id,
-        CONCAT(u.first_name, ' ', u.last_name) as student_name,
-        s.registration_number, s.year, s.cgpa, s.department
-      FROM applications a
-      JOIN projects p ON a.project_id = p.id
-      JOIN faculty_profiles fp ON p.faculty_id = fp.id
-      JOIN student_profiles s ON a.student_id = s.id
-      JOIN users u ON s.user_id = u.id
-      WHERE a.id = ? AND fp.user_id = ?
-      LIMIT 1
-    `, [id, userResult.user.id]);
+    const userId = toObjectId(userResult.user.id);
+    if (!userId) {
+      return NextResponse.json(
+        { success: false, message: "Invalid user ID" },
+        { status: 400 }
+      );
+    }
+
+    // Get faculty profile
+    const facultyProfile = await FacultyProfile.findOne({ user_id: userId });
+    if (!facultyProfile) {
+      return NextResponse.json(
+        { success: false, message: "Faculty profile not found" },
+        { status: 404 }
+      );
+    }
+
+    // Fetch application with all related data using aggregation
+    const applications = await Application.aggregate([
+      { $match: { _id: id } },
+      {
+        $lookup: {
+          from: "projects",
+          localField: "project_id",
+          foreignField: "_id",
+          as: "project",
+        },
+      },
+      { $unwind: "$project" },
+      {
+        $match: {
+          "project.faculty_id": facultyProfile._id,
+        },
+      },
+      {
+        $lookup: {
+          from: "studentprofiles",
+          localField: "student_id",
+          foreignField: "_id",
+          as: "studentProfile",
+        },
+      },
+      { $unwind: "$studentProfile" },
+      {
+        $lookup: {
+          from: "users",
+          localField: "studentProfile.user_id",
+          foreignField: "_id",
+          as: "user",
+        },
+      },
+      { $unwind: "$user" },
+      {
+        $project: {
+          id: { $toString: "$_id" },
+          status: 1,
+          message: "$cover_letter",
+          feedback: 1,
+          applied_at: 1,
+          project_id: { $toString: "$project._id" },
+          project_title: "$project.title",
+          project_description: "$project.description",
+          research_area: "$project.research_area",
+          positions: "$project.positions",
+          deadline: "$project.deadline",
+          start_date: "$project.start_date",
+          student_id: { $toString: "$studentProfile._id" },
+          student_name: { $concat: ["$user.first_name", " ", "$user.last_name"] },
+          registration_number: "$studentProfile.registration_number",
+          year: "$studentProfile.year",
+          cgpa: "$studentProfile.cgpa",
+          department: "$studentProfile.department",
+        },
+      },
+      { $limit: 1 },
+    ]);
 
     if (applications.length === 0) {
       return NextResponse.json(
@@ -87,7 +149,10 @@ export async function GET(
 
 export async function PUT(request: Request, { params }: { params: { id: string } }) {
   try {
-    const id = Number(params.id);
+    const id = toObjectId(params.id);
+    if (!id) {
+      return NextResponse.json({ success: false, message: "Invalid application ID" }, { status: 400 });
+    }
     const body = await request.json();
     let status = body.status as "approved" | "accepted" | "rejected";
     const feedback = body.feedback as string | undefined;
@@ -100,7 +165,7 @@ export async function PUT(request: Request, { params }: { params: { id: string }
     if (!id || (status !== "accepted" && status !== "rejected")) {
       return NextResponse.json({ success: false, message: "Invalid payload" }, { status: 400 });
     }
-    const result = await updateApplicationStatus(id, status, feedback);
+    const result = await updateApplicationStatus(String(id), status, feedback);
     if (!result.success) {
       return NextResponse.json({ success: false, message: result.message }, { status: 400 });
     }

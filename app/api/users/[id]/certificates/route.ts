@@ -1,23 +1,31 @@
 import type { NextRequest } from "next/server"
-import { sql } from "@/lib/db"
+import { connectToMongoDB } from "@/lib/mongodb"
+import { StudentCertificate } from "@/lib/models"
 import { createApiResponse, handleApiError, parseJsonBody } from "@/lib/api-utils"
+import { toObjectId, toPlainObject } from "@/lib/db"
 
 // POST /api/users/[id]/certificates - Save certificate metadata for a user
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const userId = Number.parseInt(params.id)
-    if (isNaN(userId)) {
+    await connectToMongoDB()
+    const userId = toObjectId(params.id)
+    if (!userId) {
       return createApiResponse(false, "Invalid user ID")
     }
-    const body = await parseJsonBody<{ file_url: string, name: string }>(request)
+
+    const body = await parseJsonBody<{ file_url: string; name: string }>(request)
     if (!body || !body.file_url || !body.name) {
       return createApiResponse(false, "Missing file_url or name")
     }
+
     // Insert certificate metadata
-    await sql`
-      INSERT INTO student_certificates (user_id, file_url, name, uploaded_at)
-      VALUES (${userId}, ${body.file_url}, ${body.name}, CURRENT_TIMESTAMP)
-    `
+    await StudentCertificate.create({
+      user_id: userId,
+      file_url: body.file_url,
+      name: body.name,
+      uploaded_at: new Date(),
+    })
+
     return createApiResponse(true, "Certificate metadata saved successfully")
   } catch (error) {
     return handleApiError(error)
@@ -27,13 +35,25 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 // GET /api/users/[id]/certificates - Get all certificates for a user
 export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const userId = Number.parseInt(params.id)
-    if (isNaN(userId)) {
+    await connectToMongoDB()
+    const userId = toObjectId(params.id)
+    if (!userId) {
       return createApiResponse(false, "Invalid user ID")
     }
-    const result = await sql`SELECT id, file_url, name, uploaded_at FROM student_certificates WHERE user_id = ${userId} ORDER BY uploaded_at DESC`
-    return createApiResponse(true, "Certificates found", result)
+
+    const results = await StudentCertificate.find({ user_id: userId })
+      .sort({ uploaded_at: -1 })
+      .lean()
+
+    const certificates = results.map((cert) => ({
+      id: cert._id.toString(),
+      file_url: cert.file_url,
+      name: cert.name,
+      uploaded_at: cert.uploaded_at,
+    }))
+
+    return createApiResponse(true, "Certificates found", certificates)
   } catch (error) {
     return handleApiError(error)
   }
-} 
+}

@@ -2,14 +2,15 @@
 
 import { cookies } from "next/headers"
 import { redirect } from "next/navigation"
-import { sql, hashPassword, comparePassword, getPool } from "@/lib/db"
+import { hashPassword, comparePassword, toPlainObject, toObjectId } from "@/lib/db"
+import { connectToMongoDB } from "@/lib/mongodb"
+import { User, LoginActivity, FacultyProfile, StudentProfile } from "@/lib/models"
 import { jwtVerify, SignJWT } from "jose"
 import { nanoid } from "nanoid"
 import { JWT_SECRET, COOKIE_SETTINGS, JWT_EXPIRATION } from "@/lib/env"
 
 // Get user agent details
 function getUserAgentDetails(userAgent: string) {
-  // Simple device detection
   const isMobile = /mobile|android|iphone|ipad|ipod/i.test(userAgent)
   const isTablet = /tablet|ipad/i.test(userAgent)
   const isDesktop = !isMobile && !isTablet
@@ -19,17 +20,8 @@ function getUserAgentDetails(userAgent: string) {
   if (isTablet) deviceType = "Tablet"
   if (isDesktop) deviceType = "Desktop"
 
-  // Simple browser detection
-  let browser = "Unknown"
-  if (userAgent.includes("Firefox")) browser = "Firefox"
-  if (userAgent.includes("Chrome")) browser = "Chrome"
-  if (userAgent.includes("Safari") && !userAgent.includes("Chrome")) browser = "Safari"
-  if (userAgent.includes("Edge")) browser = "Edge"
-  if (userAgent.includes("MSIE") || userAgent.includes("Trident/")) browser = "Internet Explorer"
-
   return {
     deviceType,
-    browser,
     userAgent,
   }
 }
@@ -38,12 +30,13 @@ function getUserAgentDetails(userAgent: string) {
 export async function login(formData: FormData) {
   try {
     console.log("Login attempt started")
+    await connectToMongoDB()
+    
     const email = formData.get("email") as string
     const password = formData.get("password") as string
     const userAgent = (formData.get("userAgent") as string) || "Unknown"
     const ipAddress = (formData.get("ipAddress") as string) || "Unknown"
 
-    // Validate input
     if (!email || !password) {
       console.log("Missing email or password")
       return { success: false, message: "Email and password are required" }
@@ -52,48 +45,41 @@ export async function login(formData: FormData) {
     console.log(`Login attempt for email: ${email}`)
 
     // Get user from database
-    const users = await sql`
-      SELECT 
-        u.id, u.role, u.first_name, u.last_name, u.email, u.password_hash
-      FROM 
-        users u
-      WHERE 
-        u.email = ${email}
-    `
+    const user = await User.findOne({ email }).lean()
 
-    if (users.length === 0) {
+    if (!user) {
       console.log(`User not found: ${email}`)
       return { success: false, message: "Invalid email or password" }
     }
 
-    const user = users[0]
-    console.log(`User found: ${user.id}, role: ${user.role}`)
+    console.log(`User found: ${user._id}, role: ${user.role}`)
 
     // Verify password
     const passwordValid = await comparePassword(password, user.password_hash)
 
     // Get user agent details
-    const { deviceType, browser } = getUserAgentDetails(userAgent)
+    const { deviceType } = getUserAgentDetails(userAgent)
 
     // Record login attempt
-    await sql`
-      INSERT INTO login_activity (
-        user_id, timestamp, ip_address, user_agent, success, device_type
-      ) VALUES (
-        ${user.id}, CURRENT_TIMESTAMP, ${ipAddress}, ${userAgent}, ${passwordValid}, ${deviceType}
-      )
-    `
+    await LoginActivity.create({
+      user_id: user._id,
+      timestamp: new Date(),
+      ip_address: ipAddress,
+      user_agent: userAgent,
+      success: passwordValid,
+      device_type: deviceType,
+    })
 
     if (!passwordValid) {
-      console.log(`Invalid password for user: ${user.id}`)
+      console.log(`Invalid password for user: ${user._id}`)
       return { success: false, message: "Invalid email or password" }
     }
 
-    console.log(`Login successful for user: ${user.id}`)
+    console.log(`Login successful for user: ${user._id}`)
 
     // Create JWT token
     const token = await new SignJWT({
-      id: user.id,
+      id: user._id.toString(),
       role: user.role,
       email: user.email,
       name: `${user.first_name} ${user.last_name}`,
@@ -111,7 +97,7 @@ export async function login(formData: FormData) {
       success: true,
       message: "Login successful",
       user: {
-        id: user.id,
+        id: user._id.toString(),
         role: user.role,
         name: `${user.first_name} ${user.last_name}`,
         email: user.email,
@@ -130,6 +116,8 @@ export async function login(formData: FormData) {
 export async function register(formData: FormData) {
   try {
     console.log("Registration started")
+    await connectToMongoDB()
+    
     const role = formData.get("role") as string
     const firstName = formData.get("firstName") as string
     const lastName = formData.get("lastName") as string
@@ -173,11 +161,9 @@ export async function register(formData: FormData) {
     console.log(`Registration attempt for email: ${email}, role: ${role}`)
 
     // Check if email already exists
-    const existingUser = await sql`
-      SELECT id FROM users WHERE email = ${email}
-    `
+    const existingUser = await User.findOne({ email })
 
-    if (existingUser.length > 0) {
+    if (existingUser) {
       console.log(`Email already exists: ${email}`)
       return { success: false, message: "Email already in use" }
     }
@@ -185,63 +171,55 @@ export async function register(formData: FormData) {
     // Hash password
     const hashedPassword = await hashPassword(password)
 
-    // Start a transaction using mysql2/promise
-    const pool = getPool()
-    const connection = await pool.getConnection()
-    try {
-      await connection.beginTransaction()
-      
-      // Insert user
-      const [userResult] = await connection.query(
-        `INSERT INTO users (role, first_name, last_name, email, password_hash) VALUES (?, ?, ?, ?, ?)`,
-        [role, firstName, lastName, email, hashedPassword]
-      )
-      // @ts-ignore
-      const userId = userResult.insertId
+    // Create user
+    const user = await User.create({
+      role: role as "faculty" | "student",
+      first_name: firstName,
+      last_name: lastName,
+      email,
+      password_hash: hashedPassword,
+    })
 
-      // Insert role-specific profile
-      if (role === "faculty") {
-        await connection.query(
-          `INSERT INTO faculty_profiles (user_id, faculty_id, department, specialization, date_of_joining, date_of_birth) VALUES (?, ?, ?, ?, ?, ?)`,
-          [userId, facultyId, department, specialization, dateOfJoining, dateOfBirth]
-        )
-      } else if (role === "student") {
-        await connection.query(
-          `INSERT INTO student_profiles (user_id, registration_number, department, year, cgpa) VALUES (?, ?, ?, ?, ?)`,
-          [userId, registrationNumber, department, year, Number.parseFloat(cgpa)]
-        )
-      }
-
-      // Get user agent details
-      const { deviceType } = getUserAgentDetails(userAgent)
-
-      // Record successful registration as a login
-      await connection.query(
-        `INSERT INTO login_activity (user_id, timestamp, ip_address, user_agent, success, device_type) VALUES (?, CURRENT_TIMESTAMP, ?, ?, true, ?)`,
-        [userId, ipAddress, userAgent, deviceType]
-      )
-
-      await connection.commit()
-      connection.release()
-      
-      // Get the created user data
-      const [userData] = await sql`
-        SELECT id, role, first_name, last_name, email, created_at, updated_at
-        FROM users WHERE id = ${userId}
-      `
-      
-      return userData[0]
-    } catch (err) {
-      await connection.rollback()
-      connection.release()
-      throw err
+    // Create role-specific profile
+    if (role === "faculty") {
+      await FacultyProfile.create({
+        user_id: user._id,
+        faculty_id: facultyId,
+        department,
+        specialization,
+        date_of_joining: new Date(dateOfJoining),
+        date_of_birth: new Date(dateOfBirth),
+      })
+    } else if (role === "student") {
+      await StudentProfile.create({
+        user_id: user._id,
+        registration_number: registrationNumber,
+        department,
+        year,
+        cgpa: Number.parseFloat(cgpa),
+      })
     }
+
+    // Get user agent details
+    const { deviceType } = getUserAgentDetails(userAgent)
+
+    // Record successful registration as a login
+    await LoginActivity.create({
+      user_id: user._id,
+      timestamp: new Date(),
+      ip_address: ipAddress,
+      user_agent: userAgent,
+      success: true,
+      device_type: deviceType,
+    })
+
+    const userData = toPlainObject(user)
+    return userData
   } catch (error) {
     console.error("Registration error:", error)
     return { success: false, message: "Registration failed" }
   }
 }
-
 
 // Register faculty
 export async function registerFaculty(data: any) {
@@ -293,6 +271,8 @@ export async function logout() {
 // Get current user
 export async function getCurrentUser() {
   try {
+    await connectToMongoDB()
+    
     const session = cookies().get("session")?.value
 
     if (!session) {
@@ -307,50 +287,27 @@ export async function getCurrentUser() {
         return { success: false, message: "Invalid session" }
       }
 
-      // Get user
-      const users = await sql`
-        SELECT 
-          id, role, first_name, last_name, email, created_at, updated_at
-        FROM 
-          users
-        WHERE 
-          id = ${payload.id}
-      `
+      // Get user (convert string ID to ObjectId)
+      const user = await User.findById(toObjectId(payload.id as string)).lean()
 
-      if (users.length === 0) {
+      if (!user) {
         return { success: false, message: "User not found" }
       }
-
-      const user = users[0]
 
       // Get profile
       let profile = null
       if (user.role === "faculty") {
-        const facultyProfiles = await sql`
-          SELECT 
-            faculty_id, department, specialization, date_of_joining, date_of_birth
-          FROM 
-            faculty_profiles
-          WHERE 
-            user_id = ${user.id}
-        `
-        profile = facultyProfiles[0]
+        const facultyProfile = await FacultyProfile.findOne({ user_id: user._id }).lean()
+        profile = facultyProfile ? toPlainObject(facultyProfile) : null
       } else if (user.role === "student") {
-        const studentProfiles = await sql`
-          SELECT 
-            registration_number, department, year, cgpa
-          FROM 
-            student_profiles
-          WHERE 
-            user_id = ${user.id}
-        `
-        profile = studentProfiles[0]
+        const studentProfile = await StudentProfile.findOne({ user_id: user._id }).lean()
+        profile = studentProfile ? toPlainObject(studentProfile) : null
       }
 
       return {
         success: true,
         user: {
-          ...user,
+          ...toPlainObject(user),
           profile,
         },
       }

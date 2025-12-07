@@ -1,23 +1,23 @@
 import type { NextRequest } from "next/server"
-import { sql } from "@/lib/db"
+import { connectToMongoDB } from "@/lib/mongodb"
+import { User, LoginActivity } from "@/lib/models"
 import { createApiResponse, handleApiError } from "@/lib/api-utils"
 import { cache } from '@/lib/cache'
+import { toObjectId, toPlainObject } from "@/lib/db"
 
 // GET /api/users/[id]/login-activity - Get login activity for a specific user
 export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const userId = Number.parseInt(params.id)
+    await connectToMongoDB()
+    const userId = toObjectId(params.id)
 
-    if (isNaN(userId)) {
+    if (!userId) {
       return createApiResponse(false, "Invalid user ID")
     }
 
     // Check if user exists
-    const existingUser = await sql`
-      SELECT id FROM users WHERE id = ${userId}
-    `
-
-    if (existingUser.length === 0) {
+    const existingUser = await User.findById(userId)
+    if (!existingUser) {
       return createApiResponse(false, "User not found", undefined, "NOT_FOUND")
     }
 
@@ -28,8 +28,8 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
     const success = searchParams.get("success")
 
     // Cache key based on params
-    const cacheKey = `user-login-activity:list:${userId}:${success || 'all'}:${limit}:${offset}`
-    const cacheCountKey = `user-login-activity:count:${userId}:${success || 'all'}`
+    const cacheKey = `user-login-activity:list:${params.id}:${success || 'all'}:${limit}:${offset}`
+    const cacheCountKey = `user-login-activity:count:${params.id}:${success || 'all'}`
     const cachedActivities = cache.get(cacheKey)
     const cachedCount = cache.get(cacheCountKey)
     if (cachedActivities && cachedCount) {
@@ -44,50 +44,31 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
     }
 
     // Build query
-    let query = `
-      SELECT 
-        id, timestamp, ip_address, user_agent, success, location, device_type
-      FROM 
-        login_activity
-      WHERE 
-        user_id = $1
-    `
-
-    const params: any[] = [userId]
-
+    const query: any = { user_id: userId }
     if (success !== null) {
-      query += ` AND success = $2`
-      params.push(success === "true")
+      query.success = success === "true"
     }
-
-    query += ` ORDER BY timestamp DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`
-    params.push(limit, offset)
 
     // Execute query
-    const activities = await sql(query, params)
+    const activities = await LoginActivity.find(query)
+      .sort({ timestamp: -1 })
+      .skip(offset)
+      .limit(limit)
+      .lean()
 
     // Get total count
-    const countQuery = `
-      SELECT COUNT(*) as total 
-      FROM login_activity 
-      WHERE user_id = $1 ${success !== null ? "AND success = $2" : ""}
-    `
+    const total = await LoginActivity.countDocuments(query)
 
-    const countParams = [userId]
-    if (success !== null) {
-      countParams.push(success === "true")
-    }
-
-    const countResult = await sql(countQuery, countParams)
+    const activitiesPlain = activities.map(toPlainObject)
 
     // Set cache for 30 seconds
-    cache.set(cacheKey, activities, 30)
-    cache.set(cacheCountKey, Number.parseInt(countResult[0].total), 30)
+    cache.set(cacheKey, activitiesPlain, 30)
+    cache.set(cacheCountKey, total, 30)
 
     return createApiResponse(true, "Login activity retrieved successfully", {
-      activities,
+      activities: activitiesPlain,
       pagination: {
-        total: Number.parseInt(countResult[0].total),
+        total,
         limit,
         offset,
       },

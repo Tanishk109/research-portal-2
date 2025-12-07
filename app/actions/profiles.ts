@@ -1,8 +1,10 @@
 "use server"
 
-import { sql } from "@/lib/db"
+import { connectToMongoDB } from "@/lib/mongodb"
+import { User, FacultyProfile, StudentProfile } from "@/lib/models"
 import { getCurrentUser } from "./auth"
 import { revalidatePath } from "next/cache"
+import { toObjectId, toPlainObject } from "@/lib/db"
 
 export type StudentProfileData = {
   firstName: string
@@ -32,6 +34,7 @@ export type FacultyProfileData = {
 // Get current user's profile data
 export async function getCurrentUserProfile() {
   try {
+    await connectToMongoDB()
     const currentUserResult = await getCurrentUser()
 
     if (!currentUserResult.success) {
@@ -39,52 +42,57 @@ export async function getCurrentUserProfile() {
     }
 
     const currentUser = currentUserResult.user
+    const userId = toObjectId(currentUser.id)
+
+    if (!userId) {
+      return { success: false, message: "Invalid user ID" }
+    }
 
     if (currentUser.role === "student") {
-      const studentProfile = await sql`
-        SELECT 
-          u.first_name,
-          u.last_name,
-          u.email,
-          sp.registration_number,
-          sp.department,
-          sp.year,
-          sp.cgpa,
-          sp.phone,
-          sp.bio
-        FROM users u
-        JOIN student_profiles sp ON u.id = sp.user_id
-        WHERE u.id = ${currentUser.id}
-      `
+      const user = await User.findById(userId).lean()
+      const studentProfile = await StudentProfile.findOne({ user_id: userId }).lean()
 
-      if (studentProfile.length === 0) {
+      if (!user || !studentProfile) {
         return { success: false, message: "Student profile not found" }
       }
 
-      return { success: true, profile: studentProfile[0] }
+      return {
+        success: true,
+        profile: {
+          first_name: user.first_name,
+          last_name: user.last_name,
+          email: user.email,
+          registration_number: studentProfile.registration_number,
+          department: studentProfile.department,
+          year: studentProfile.year,
+          cgpa: studentProfile.cgpa,
+          phone: (studentProfile as any).phone || null,
+          bio: (studentProfile as any).bio || null,
+        },
+      }
     } else if (currentUser.role === "faculty") {
-      const facultyProfile = await sql`
-        SELECT 
-          u.first_name,
-          u.last_name,
-          u.email,
-          fp.faculty_id,
-          fp.department,
-          fp.specialization,
-          fp.date_of_joining,
-          fp.date_of_birth,
-          fp.phone,
-          fp.bio
-        FROM users u
-        JOIN faculty_profiles fp ON u.id = fp.user_id
-        WHERE u.id = ${currentUser.id}
-      `
+      const user = await User.findById(userId).lean()
+      const facultyProfile = await FacultyProfile.findOne({ user_id: userId }).lean()
 
-      if (facultyProfile.length === 0) {
+      if (!user || !facultyProfile) {
         return { success: false, message: "Faculty profile not found" }
       }
 
-      return { success: true, profile: facultyProfile[0] }
+      return {
+        success: true,
+        profile: {
+          first_name: user.first_name,
+          last_name: user.last_name,
+          email: user.email,
+          faculty_id: facultyProfile.faculty_id,
+          department: facultyProfile.department,
+          specialization: facultyProfile.specialization,
+          date_of_joining: facultyProfile.date_of_joining,
+          date_of_birth: facultyProfile.date_of_birth,
+          phone: (facultyProfile as any).phone || null,
+          bio: (facultyProfile as any).bio || null,
+        },
+      }
     }
 
     return { success: false, message: "Invalid user role" }
@@ -97,6 +105,7 @@ export async function getCurrentUserProfile() {
 // Update student profile
 export async function updateStudentProfile(data: StudentProfileData) {
   try {
+    await connectToMongoDB()
     const currentUserResult = await getCurrentUser()
 
     if (!currentUserResult.success) {
@@ -109,30 +118,33 @@ export async function updateStudentProfile(data: StudentProfileData) {
       return { success: false, message: "Unauthorized" }
     }
 
-    // Update user table
-    await sql`
-      UPDATE users 
-      SET 
-        first_name = ${data.firstName},
-        last_name = ${data.lastName},
-        email = ${data.email},
-        updated_at = CURRENT_TIMESTAMP
-      WHERE id = ${currentUser.id}
-    `
+    const userId = toObjectId(currentUser.id)
+    if (!userId) {
+      return { success: false, message: "Invalid user ID" }
+    }
+
+    // Update user
+    await User.findByIdAndUpdate(userId, {
+      first_name: data.firstName,
+      last_name: data.lastName,
+      email: data.email,
+      updated_at: new Date(),
+    })
 
     // Update student profile
-    await sql`
-      UPDATE student_profiles 
-      SET 
-        registration_number = ${data.registrationNumber},
-        department = ${data.department},
-        year = ${data.year},
-        cgpa = ${data.cgpa},
-        phone = ${data.phone || null},
-        bio = ${data.bio || null},
-        updated_at = CURRENT_TIMESTAMP
-      WHERE user_id = ${currentUser.id}
-    `
+    await StudentProfile.findOneAndUpdate(
+      { user_id: userId },
+      {
+        registration_number: data.registrationNumber,
+        department: data.department,
+        year: data.year,
+        cgpa: data.cgpa,
+        phone: data.phone || undefined,
+        bio: data.bio || undefined,
+        updated_at: new Date(),
+      },
+      { upsert: false }
+    )
 
     revalidatePath("/dashboard/student/profile")
     revalidatePath("/dashboard/student")
@@ -147,6 +159,7 @@ export async function updateStudentProfile(data: StudentProfileData) {
 // Update faculty profile
 export async function updateFacultyProfile(data: FacultyProfileData) {
   try {
+    await connectToMongoDB()
     const currentUserResult = await getCurrentUser()
 
     if (!currentUserResult.success) {
@@ -159,31 +172,34 @@ export async function updateFacultyProfile(data: FacultyProfileData) {
       return { success: false, message: "Unauthorized" }
     }
 
-    // Update user table
-    await sql`
-      UPDATE users 
-      SET 
-        first_name = ${data.firstName},
-        last_name = ${data.lastName},
-        email = ${data.email},
-        updated_at = CURRENT_TIMESTAMP
-      WHERE id = ${currentUser.id}
-    `
+    const userId = toObjectId(currentUser.id)
+    if (!userId) {
+      return { success: false, message: "Invalid user ID" }
+    }
+
+    // Update user
+    await User.findByIdAndUpdate(userId, {
+      first_name: data.firstName,
+      last_name: data.lastName,
+      email: data.email,
+      updated_at: new Date(),
+    })
 
     // Update faculty profile
-    await sql`
-      UPDATE faculty_profiles 
-      SET 
-        faculty_id = ${data.facultyId},
-        department = ${data.department},
-        specialization = ${data.specialization},
-        date_of_joining = ${data.dateOfJoining},
-        date_of_birth = ${data.dateOfBirth},
-        phone = ${data.phone || null},
-        bio = ${data.bio || null},
-        updated_at = CURRENT_TIMESTAMP
-      WHERE user_id = ${currentUser.id}
-    `
+    await FacultyProfile.findOneAndUpdate(
+      { user_id: userId },
+      {
+        faculty_id: data.facultyId,
+        department: data.department,
+        specialization: data.specialization,
+        date_of_joining: new Date(data.dateOfJoining),
+        date_of_birth: new Date(data.dateOfBirth),
+        phone: data.phone || undefined,
+        bio: data.bio || undefined,
+        updated_at: new Date(),
+      },
+      { upsert: false }
+    )
 
     revalidatePath("/dashboard/faculty/profile")
     revalidatePath("/dashboard/faculty")
@@ -193,4 +209,4 @@ export async function updateFacultyProfile(data: FacultyProfileData) {
     console.error("Error updating faculty profile:", error)
     return { success: false, message: "Failed to update profile" }
   }
-} 
+}

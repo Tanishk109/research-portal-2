@@ -1,36 +1,50 @@
 import { NextResponse } from "next/server";
-import { sql } from "@/lib/db";
+import { connectToMongoDB } from "@/lib/mongodb";
+import { User, StudentProfile } from "@/lib/models";
+import { toPlainObject } from "@/lib/db";
 
 export async function GET() {
   try {
+    await connectToMongoDB();
+    
     // Get all student accounts with their profile details
-    const students = await sql`
-      SELECT 
-        u.id,
-        u.first_name,
-        u.last_name,
-        u.email,
-        u.created_at,
-        u.updated_at,
-        sp.registration_number,
-        sp.department,
-        sp.year,
-        sp.cgpa
-      FROM users u
-      LEFT JOIN student_profiles sp ON u.id = sp.user_id
-      WHERE u.role = 'student'
-      ORDER BY u.created_at DESC
-    `;
+    const students = await User.aggregate([
+      { $match: { role: "student" } },
+      {
+        $lookup: {
+          from: "studentprofiles",
+          localField: "_id",
+          foreignField: "user_id",
+          as: "profile",
+        },
+      },
+      { $unwind: { path: "$profile", preserveNullAndEmptyArrays: true } },
+      {
+        $project: {
+          id: { $toString: "$_id" },
+          first_name: 1,
+          last_name: 1,
+          email: 1,
+          created_at: 1,
+          updated_at: 1,
+          registration_number: "$profile.registration_number",
+          department: "$profile.department",
+          year: "$profile.year",
+          cgpa: "$profile.cgpa",
+        },
+      },
+      { $sort: { created_at: -1 } },
+    ]);
 
     return NextResponse.json({ 
       success: true, 
       students,
       count: students.length
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error fetching students:", error);
     return NextResponse.json(
-      { success: false, message: `Failed to fetch student details: ${error.message}` }, 
+      { success: false, message: `Failed to fetch student details: ${error?.message || String(error)}` }, 
       { status: 500 }
     );
   }

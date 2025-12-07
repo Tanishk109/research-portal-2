@@ -1,21 +1,39 @@
-import { sql } from "@/lib/db"
+import { connectToMongoDB } from "@/lib/mongodb"
+import { User, FacultyProfile } from "@/lib/models"
 import Image from "next/image"
 import { Card, CardHeader, CardContent, CardFooter, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { useState } from "react"
+import { toPlainObject } from "@/lib/db"
 
 export const dynamic = "force-dynamic"
 
 export default async function FacultyDirectory() {
   // Fetch all faculty with their profile info
-  const faculty = await sql`
-    SELECT u.first_name, u.last_name, u.email, fp.department, fp.specialization
-    FROM users u
-    JOIN faculty_profiles fp ON u.id = fp.user_id
-    WHERE u.role = 'faculty'
-    ORDER BY fp.department, u.last_name
-  `
+  await connectToMongoDB()
+  const facultyData = await User.aggregate([
+    { $match: { role: "faculty" } },
+    {
+      $lookup: {
+        from: "facultyprofiles",
+        localField: "_id",
+        foreignField: "user_id",
+        as: "profile",
+      },
+    },
+    { $unwind: "$profile" },
+    {
+      $project: {
+        first_name: 1,
+        last_name: 1,
+        email: 1,
+        department: "$profile.department",
+        specialization: "$profile.specialization",
+      },
+    },
+    { $sort: { department: 1, last_name: 1 } },
+  ])
+  const faculty = facultyData.map(toPlainObject)
 
   // The search/filter will be client-side only for now
   // (If you want server-side search, let me know)
@@ -58,4 +76,4 @@ export default async function FacultyDirectory() {
       </div>
     </div>
   )
-} 
+}

@@ -48,18 +48,25 @@ export default function LoginPage() {
       try {
         const response = await api.get(endpoints.health)
 
-        if (response.success) {
-          if (response.data?.status === "preview_no_db") {
+        if (response.success && response.data) {
+          // Check if database is connected
+          if (response.data.status === "preview_no_db") {
             setDbStatus("preview")
-          } else {
+          } else if (response.data.database?.connected === true || response.data.status === "healthy") {
             setDbStatus("connected")
+          } else {
+            setDbStatus("disconnected")
           }
         } else {
-          setDbStatus("disconnected")
+          // If health check fails, still allow login (database might be slow to connect)
+          // The actual login will handle the connection
+          console.warn("Health check returned unsuccessful, but allowing login attempt")
+          setDbStatus("connected") // Allow login to proceed
         }
       } catch (error) {
         console.error("Health check error:", error)
-        setDbStatus("disconnected")
+        // Don't block login if health check fails - let the actual login handle it
+        setDbStatus("connected") // Allow login to proceed
       }
     }
 

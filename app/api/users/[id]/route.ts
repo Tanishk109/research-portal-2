@@ -1,56 +1,38 @@
 import type { NextRequest } from "next/server"
-import { sql } from "@/lib/db"
+import { connectToMongoDB } from "@/lib/mongodb"
+import { User, FacultyProfile, StudentProfile } from "@/lib/models"
 import { createApiResponse, handleApiError, parseJsonBody } from "@/lib/api-utils"
+import { toObjectId, toPlainObject } from "@/lib/db"
 
 // GET /api/users/[id] - Get a specific user
 export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const userId = Number.parseInt(params.id)
+    await connectToMongoDB()
+    const userId = toObjectId(params.id)
 
-    if (isNaN(userId)) {
+    if (!userId) {
       return createApiResponse(false, "Invalid user ID")
     }
 
     // Get user
-    const user = await sql`
-      SELECT 
-        u.id, u.role, u.first_name, u.last_name, u.email, u.created_at, u.updated_at
-      FROM 
-        users u
-      WHERE 
-        u.id = ${userId}
-    `
+    const user = await User.findById(userId).lean()
 
-    if (user.length === 0) {
+    if (!user) {
       return createApiResponse(false, "User not found", undefined, "NOT_FOUND")
     }
 
     // Get role-specific profile
     let profile = null
-    if (user[0].role === "faculty") {
-      const facultyProfile = await sql`
-        SELECT 
-          faculty_id, department, specialization, date_of_joining, date_of_birth
-        FROM 
-          faculty_profiles
-        WHERE 
-          user_id = ${userId}
-      `
-      profile = facultyProfile[0]
-    } else if (user[0].role === "student") {
-      const studentProfile = await sql`
-        SELECT 
-          registration_number, department, year, cgpa
-        FROM 
-          student_profiles
-        WHERE 
-          user_id = ${userId}
-      `
-      profile = studentProfile[0]
+    if (user.role === "faculty") {
+      const facultyProfile = await FacultyProfile.findOne({ user_id: userId }).lean()
+      profile = facultyProfile ? toPlainObject(facultyProfile) : null
+    } else if (user.role === "student") {
+      const studentProfile = await StudentProfile.findOne({ user_id: userId }).lean()
+      profile = studentProfile ? toPlainObject(studentProfile) : null
     }
 
     return createApiResponse(true, "User retrieved successfully", {
-      user: user[0],
+      user: toPlainObject(user),
       profile,
     })
   } catch (error) {
@@ -61,9 +43,10 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 // PUT /api/users/[id] - Update a user
 export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const userId = Number.parseInt(params.id)
+    await connectToMongoDB()
+    const userId = toObjectId(params.id)
 
-    if (isNaN(userId)) {
+    if (!userId) {
       return createApiResponse(false, "Invalid user ID")
     }
 
@@ -85,143 +68,53 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     }
 
     // Check if user exists
-    const existingUser = await sql`
-      SELECT id, role FROM users WHERE id = ${userId}
-    `
+    const existingUser = await User.findById(userId).lean()
 
-    if (existingUser.length === 0) {
+    if (!existingUser) {
       return createApiResponse(false, "User not found", undefined, "NOT_FOUND")
     }
 
-    const userRole = existingUser[0].role
+    const userRole = existingUser.role
 
-    // Start a transaction
-    const result = await sql.begin(async (sql) => {
-      // Update user fields if provided
-      if (body.first_name || body.last_name || body.email) {
-        const updates = []
-        const values: any[] = []
+    // Update user fields if provided
+    if (body.first_name || body.last_name || body.email) {
+      const updateData: any = {}
+      if (body.first_name) updateData.first_name = body.first_name
+      if (body.last_name) updateData.last_name = body.last_name
+      if (body.email) updateData.email = body.email
+      updateData.updated_at = new Date()
 
-        if (body.first_name) {
-          updates.push(`first_name = $${updates.length + 1}`)
-          values.push(body.first_name)
-        }
+      await User.findByIdAndUpdate(userId, updateData)
+    }
 
-        if (body.last_name) {
-          updates.push(`last_name = $${updates.length + 1}`)
-          values.push(body.last_name)
-        }
+    // Update profile fields if provided
+    if (userRole === "faculty") {
+      if (body.department || body.specialization || body.date_of_joining || body.date_of_birth) {
+        const updateData: any = {}
+        if (body.department) updateData.department = body.department
+        if (body.specialization) updateData.specialization = body.specialization
+        if (body.date_of_joining) updateData.date_of_joining = new Date(body.date_of_joining)
+        if (body.date_of_birth) updateData.date_of_birth = new Date(body.date_of_birth)
+        updateData.updated_at = new Date()
 
-        if (body.email) {
-          updates.push(`email = $${updates.length + 1}`)
-          values.push(body.email)
-        }
-
-        updates.push(`updated_at = $${updates.length + 1}`)
-        values.push(new Date())
-
-        values.push(userId)
-
-        await sql(
-          `
-          UPDATE users 
-          SET ${updates.join(", ")} 
-          WHERE id = $${values.length}
-        `,
-          values,
-        )
+        await FacultyProfile.findOneAndUpdate({ user_id: userId }, updateData, { upsert: false })
       }
+    } else if (userRole === "student") {
+      if (body.department || body.year || body.cgpa) {
+        const updateData: any = {}
+        if (body.department) updateData.department = body.department
+        if (body.year) updateData.year = body.year
+        if (body.cgpa) updateData.cgpa = body.cgpa
+        updateData.updated_at = new Date()
 
-      // Update profile fields if provided
-      if (userRole === "faculty") {
-        if (body.department || body.specialization || body.date_of_joining || body.date_of_birth) {
-          const updates = []
-          const values: any[] = []
-
-          if (body.department) {
-            updates.push(`department = $${updates.length + 1}`)
-            values.push(body.department)
-          }
-
-          if (body.specialization) {
-            updates.push(`specialization = $${updates.length + 1}`)
-            values.push(body.specialization)
-          }
-
-          if (body.date_of_joining) {
-            updates.push(`date_of_joining = $${updates.length + 1}`)
-            values.push(body.date_of_joining)
-          }
-
-          if (body.date_of_birth) {
-            updates.push(`date_of_birth = $${updates.length + 1}`)
-            values.push(body.date_of_birth)
-          }
-
-          updates.push(`updated_at = $${updates.length + 1}`)
-          values.push(new Date())
-
-          values.push(userId)
-
-          await sql(
-            `
-            UPDATE faculty_profiles 
-            SET ${updates.join(", ")} 
-            WHERE user_id = $${values.length}
-          `,
-            values,
-          )
-        }
-      } else if (userRole === "student") {
-        if (body.department || body.year || body.cgpa) {
-          const updates = []
-          const values: any[] = []
-
-          if (body.department) {
-            updates.push(`department = $${updates.length + 1}`)
-            values.push(body.department)
-          }
-
-          if (body.year) {
-            updates.push(`year = $${updates.length + 1}`)
-            values.push(body.year)
-          }
-
-          if (body.cgpa) {
-            updates.push(`cgpa = $${updates.length + 1}`)
-            values.push(body.cgpa)
-          }
-
-          updates.push(`updated_at = $${updates.length + 1}`)
-          values.push(new Date())
-
-          values.push(userId)
-
-          await sql(
-            `
-            UPDATE student_profiles 
-            SET ${updates.join(", ")} 
-            WHERE user_id = $${values.length}
-          `,
-            values,
-          )
-        }
+        await StudentProfile.findOneAndUpdate({ user_id: userId }, updateData, { upsert: false })
       }
+    }
 
-      // Get updated user
-      const updatedUser = await sql`
-        SELECT 
-          u.id, u.role, u.first_name, u.last_name, u.email, u.created_at, u.updated_at
-        FROM 
-          users u
-        WHERE 
-          u.id = ${userId}
-      `
+    // Get updated user
+    const updatedUser = await User.findById(userId).lean()
 
-      return updatedUser[0]
-    })
-
-    return createApiResponse(true, "User updated successfully", { user: result })
+    return createApiResponse(true, "User updated successfully", { user: toPlainObject(updatedUser!) })
   } catch (error) {
     return handleApiError(error)
   }
@@ -230,25 +123,25 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
 // DELETE /api/users/[id] - Delete a user
 export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const userId = Number.parseInt(params.id)
+    await connectToMongoDB()
+    const userId = toObjectId(params.id)
 
-    if (isNaN(userId)) {
+    if (!userId) {
       return createApiResponse(false, "Invalid user ID")
     }
 
     // Check if user exists
-    const existingUser = await sql`
-      SELECT id FROM users WHERE id = ${userId}
-    `
+    const existingUser = await User.findById(userId)
 
-    if (existingUser.length === 0) {
+    if (!existingUser) {
       return createApiResponse(false, "User not found", undefined, "NOT_FOUND")
     }
 
-    // Delete user (cascade will delete profile)
-    await sql`
-      DELETE FROM users WHERE id = ${userId}
-    `
+    // Delete user (MongoDB will handle related documents if configured)
+    await User.findByIdAndDelete(userId)
+    // Also delete related profiles
+    await FacultyProfile.deleteMany({ user_id: userId })
+    await StudentProfile.deleteMany({ user_id: userId })
 
     return createApiResponse(true, "User deleted successfully")
   } catch (error) {

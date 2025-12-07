@@ -1,10 +1,13 @@
 import type { NextRequest } from "next/server"
-import { sql } from "@/lib/db"
+import { connectToMongoDB } from "@/lib/mongodb"
+import { User, FacultyProfile, StudentProfile } from "@/lib/models"
 import { createApiResponse, handleApiError, getUserIdFromRequest, getUserRoleFromRequest } from "@/lib/api-utils"
+import { toObjectId, toPlainObject } from "@/lib/db"
 
 // GET /api/auth/me - Get current user info
 export async function GET(request: NextRequest) {
   try {
+    await connectToMongoDB()
     const userId = getUserIdFromRequest(request)
     const userRole = getUserRoleFromRequest(request)
 
@@ -14,49 +17,31 @@ export async function GET(request: NextRequest) {
 
     console.log(`Getting user info for ID: ${userId}, Role: ${userRole}`)
 
-    // Get user basic info
-    const users = await sql`
-      SELECT 
-        id, role, first_name, last_name, email, created_at, updated_at
-      FROM 
-        users 
-      WHERE 
-        id = ${userId}
-    `
-
-    if (users.length === 0) {
-      return createApiResponse(false, "User not found", null, 404)
+    const userIdObj = toObjectId(userId)
+    if (!userIdObj) {
+      return createApiResponse(false, "Invalid user ID", null, 400)
     }
 
-    const user = users[0]
+    // Get user basic info
+    const user = await User.findById(userIdObj).lean()
+
+    if (!user) {
+      return createApiResponse(false, "User not found", null, 404)
+    }
 
     // Get role-specific profile
     let profile = null
     if (user.role === "faculty") {
-      const facultyProfiles = await sql`
-        SELECT 
-          faculty_id, department, specialization, date_of_joining, date_of_birth
-        FROM 
-          faculty_profiles 
-        WHERE 
-          user_id = ${userId}
-      `
-      profile = facultyProfiles[0] || null
+      const facultyProfile = await FacultyProfile.findOne({ user_id: userIdObj }).lean()
+      profile = facultyProfile ? toPlainObject(facultyProfile) : null
     } else if (user.role === "student") {
-      const studentProfiles = await sql`
-        SELECT 
-          registration_number, department, year, cgpa
-        FROM 
-          student_profiles 
-        WHERE 
-          user_id = ${userId}
-      `
-      profile = studentProfiles[0] || null
+      const studentProfile = await StudentProfile.findOne({ user_id: userIdObj }).lean()
+      profile = studentProfile ? toPlainObject(studentProfile) : null
     }
 
     return createApiResponse(true, "User info retrieved successfully", {
       user: {
-        id: user.id,
+        id: user._id.toString(),
         role: user.role,
         firstName: user.first_name,
         lastName: user.last_name,

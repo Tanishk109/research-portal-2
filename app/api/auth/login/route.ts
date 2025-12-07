@@ -1,7 +1,8 @@
 import type { NextRequest } from "next/server"
-import { sql } from "@/lib/db"
-import { createApiResponse, handleApiError } from "@/lib/api-utils"
-import { comparePassword } from "@/lib/db"
+import { NextResponse } from "next/server"
+import { connectToMongoDB } from "@/lib/mongodb"
+import { User, FacultyProfile, StudentProfile, LoginActivity } from "@/lib/models"
+import { comparePassword, toObjectId, toPlainObject } from "@/lib/db"
 import { SignJWT } from "jose"
 import { nanoid } from "nanoid"
 import { JWT_SECRET, JWT_EXPIRATION, COOKIE_SETTINGS } from "@/lib/env"
@@ -10,6 +11,7 @@ import { cookies } from "next/headers"
 // POST /api/auth/login - Login user
 export async function POST(request: NextRequest) {
   try {
+    await connectToMongoDB()
     console.log("Login request received")
     const body = await request.json()
 
@@ -18,78 +20,66 @@ export async function POST(request: NextRequest) {
     // Validate input
     if (!email || !password) {
       console.log("Missing email or password")
-      return createApiResponse(false, "Email and password are required", null, 400)
+      return NextResponse.json(
+        { success: false, message: "Email and password are required" },
+        { status: 400 }
+      )
     }
 
     console.log(`Login attempt for email: ${email}`)
 
-    // Get user from database
-    const users = await sql`
-      SELECT 
-        u.id, u.role, u.first_name, u.last_name, u.email, u.password_hash,
-        u.created_at, u.updated_at
-      FROM 
-        users u
-      WHERE 
-        u.email = ${email}
-    `
+    // Get user from database (case-insensitive email search)
+    const user = await User.findOne({ 
+      email: { $regex: new RegExp(`^${email.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') } 
+    }).lean()
 
-    if (users.length === 0) {
+    if (!user) {
       console.log(`User not found: ${email}`)
       // Skip logging for non-existent users since user_id cannot be NULL
-      return createApiResponse(false, "Invalid email or password", null, 401)
+      return NextResponse.json(
+        { success: false, message: "Invalid email or password" },
+        { status: 401 }
+      )
     }
 
-    const user = users[0]
-    console.log(`User found: ${user.id}, role: ${user.role}`)
+    console.log(`User found: ${user._id}, role: ${user.role}`)
 
     // Verify password
     const passwordValid = await comparePassword(password, user.password_hash)
 
     // Record login attempt
-    await sql`
-      INSERT INTO login_activity (
-        user_id, timestamp, ip_address, user_agent, success, device_type
-      ) VALUES (
-        ${user.id}, CURRENT_TIMESTAMP, ${ipAddress || "unknown"}, 
-        ${userAgent || "unknown"}, ${passwordValid}, 'Web'
-      )
-    `
+    await LoginActivity.create({
+      user_id: user._id,
+      timestamp: new Date(),
+      ip_address: ipAddress || "unknown",
+      user_agent: userAgent || "unknown",
+      success: passwordValid,
+      device_type: "Web",
+    })
 
     if (!passwordValid) {
-      console.log(`Invalid password for user: ${user.id}`)
-      return createApiResponse(false, "Invalid email or password", null, 401)
+      console.log(`Invalid password for user: ${user._id}`)
+      return NextResponse.json(
+        { success: false, message: "Invalid email or password" },
+        { status: 401 }
+      )
     }
 
-    console.log(`Login successful for user: ${user.id}`)
+    console.log(`Login successful for user: ${user._id}`)
 
     // Get user profile
     let profile = null
     if (user.role === "faculty") {
-      const facultyProfiles = await sql`
-        SELECT 
-          faculty_id, department, specialization, date_of_joining, date_of_birth
-        FROM 
-          faculty_profiles
-        WHERE 
-          user_id = ${user.id}
-      `
-      profile = facultyProfiles[0] || null
+      const facultyProfile = await FacultyProfile.findOne({ user_id: user._id }).lean()
+      profile = facultyProfile ? toPlainObject(facultyProfile) : null
     } else if (user.role === "student") {
-      const studentProfiles = await sql`
-        SELECT 
-          registration_number, department, year, cgpa
-        FROM 
-          student_profiles
-        WHERE 
-          user_id = ${user.id}
-      `
-      profile = studentProfiles[0] || null
+      const studentProfile = await StudentProfile.findOne({ user_id: user._id }).lean()
+      profile = studentProfile ? toPlainObject(studentProfile) : null
     }
 
     // Create JWT token
     const token = await new SignJWT({
-      id: user.id,
+      id: user._id.toString(),
       role: user.role,
       email: user.email,
       name: `${user.first_name} ${user.last_name}`,
@@ -103,19 +93,30 @@ export async function POST(request: NextRequest) {
     // Set cookie
     cookies().set("session", token, COOKIE_SETTINGS)
 
-    return createApiResponse(true, "Login successful", {
-      user: {
-        id: user.id,
-        role: user.role,
-        firstName: user.first_name,
-        lastName: user.last_name,
-        email: user.email,
-        name: `${user.first_name} ${user.last_name}`,
-        profile,
+    return NextResponse.json({
+      success: true,
+      message: "Login successful",
+      data: {
+        user: {
+          id: user._id.toString(),
+          role: user.role,
+          firstName: user.first_name,
+          lastName: user.last_name,
+          email: user.email,
+          name: `${user.first_name} ${user.last_name}`,
+          profile,
+        },
       },
     })
   } catch (error) {
     console.error("Login error:", error)
-    return handleApiError(error, "Login failed")
+    return NextResponse.json(
+      {
+        success: false,
+        message: "Login failed",
+        error: error instanceof Error ? error.message : "Unknown error",
+      },
+      { status: 500 }
+    )
   }
 }

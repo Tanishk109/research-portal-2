@@ -1,10 +1,11 @@
 "use server"
 
-import { sql } from "@/lib/db"
+import { connectToMongoDB } from "@/lib/mongodb"
+import { Project, User, FacultyProfile, Application } from "@/lib/models"
 import { getCurrentUser } from "./auth"
 import { revalidatePath } from "next/cache"
 import { cache } from "@/lib/cache"
-import { getPool } from "@/lib/db"
+import { toObjectId, toPlainObject } from "@/lib/db"
 
 // Types
 export type ProjectFormData = {
@@ -23,7 +24,7 @@ export type ProjectFormData = {
 }
 
 export type ProjectWithFaculty = {
-  id: number
+  id: string
   title: string
   description: string
   research_area: string
@@ -45,53 +46,72 @@ export async function getProjects(
   filters: { status?: string; department?: string; researchArea?: string; searchTerm?: string } = {},
 ) {
   try {
-    let query = `
-      SELECT 
-        p.id, p.title, p.description, p.research_area, p.positions, 
-        p.start_date, p.deadline, p.status, p.min_cgpa, p.eligibility, 
-        p.prerequisites, p.created_at,
-        CONCAT(u.first_name, ' ', u.last_name) as faculty_name,
-        fp.department,
-        GROUP_CONCAT(pt.tag) as tags
-      FROM projects p
-      JOIN faculty_profiles fp ON p.faculty_id = fp.id
-      JOIN users u ON fp.user_id = u.id
-      LEFT JOIN project_tags pt ON p.id = pt.project_id
-      WHERE 1=1
-    `
-    const params: any[] = []
+    await connectToMongoDB()
+
+    const matchStage: any = {}
 
     if (filters.status) {
-      query += ` AND p.status = ${filters.status}`
-    }
-
-    if (filters.department && filters.department !== "all") {
-      query += ` AND fp.department = ${filters.department}`
+      matchStage.status = filters.status
     }
 
     if (filters.researchArea && filters.researchArea !== "all") {
-      query += ` AND p.research_area = ${filters.researchArea}`
+      matchStage.research_area = filters.researchArea
     }
 
     if (filters.searchTerm) {
-      const searchTerm = `%${filters.searchTerm}%`
-      query += ` AND (p.title ILIKE ${searchTerm} OR p.description ILIKE ${searchTerm} OR CONCAT(u.first_name, ' ', u.last_name) ILIKE ${searchTerm})`
+      matchStage.$or = [
+        { title: { $regex: filters.searchTerm, $options: "i" } },
+        { description: { $regex: filters.searchTerm, $options: "i" } },
+      ]
     }
 
-    query += `
-      GROUP BY p.id, u.first_name, u.last_name, fp.department
-      ORDER BY p.created_at DESC
-    `
+    const projects = await Project.aggregate([
+      { $match: matchStage },
+      {
+        $lookup: {
+          from: "facultyprofiles",
+          localField: "faculty_id",
+          foreignField: "_id",
+          as: "facultyProfile",
+        },
+      },
+      { $unwind: "$facultyProfile" },
+      {
+        $lookup: {
+          from: "users",
+          localField: "facultyProfile.user_id",
+          foreignField: "_id",
+          as: "facultyUser",
+        },
+      },
+      { $unwind: "$facultyUser" },
+      {
+        $match: filters.department && filters.department !== "all"
+          ? { "facultyProfile.department": filters.department }
+          : {},
+      },
+      {
+        $project: {
+          id: { $toString: "$_id" },
+          title: 1,
+          description: 1,
+          research_area: 1,
+          positions: 1,
+          start_date: 1,
+          deadline: 1,
+          status: 1,
+          min_cgpa: 1,
+          eligibility: 1,
+          prerequisites: 1,
+          created_at: 1,
+          faculty_name: { $concat: ["$facultyUser.first_name", " ", "$facultyUser.last_name"] },
+          department: "$facultyProfile.department",
+          tags: { $ifNull: ["$tags", []] },
+        },
+      },
+      { $sort: { created_at: -1 } },
+    ])
 
-    const projects = await sql.unsafe(query)
-    // Ensure tags is always an array
-    for (const project of projects) {
-      if (project.tags == null) {
-        project.tags = []
-      } else if (typeof project.tags === 'string') {
-        project.tags = project.tags.split(',').map((t: string) => t.trim()).filter(Boolean)
-      }
-    }
     return projects as ProjectWithFaculty[]
   } catch (error) {
     console.error("Get all projects error:", error)
@@ -102,22 +122,57 @@ export async function getProjects(
 // Get active projects
 export async function getActiveProjects() {
   try {
-    const projects = await sql`
-      SELECT 
-        p.id, p.title, p.description, p.research_area, p.positions, 
-        p.start_date, p.deadline, p.status, p.min_cgpa, p.eligibility, 
-        p.prerequisites, p.created_at,
-        CONCAT(u.first_name, ' ', u.last_name) as faculty_name,
-        fp.department,
-        GROUP_CONCAT(pt.tag) as tags
-      FROM projects p
-      JOIN faculty_profiles fp ON p.faculty_id = fp.id
-      JOIN users u ON fp.user_id = u.id
-      LEFT JOIN project_tags pt ON p.id = pt.project_id
-      WHERE p.status = 'active' AND (p.deadline IS NULL OR p.deadline >= CURRENT_DATE)
-      GROUP BY p.id, u.first_name, u.last_name, fp.department
-      ORDER BY p.created_at DESC
-    `
+    await connectToMongoDB()
+
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+
+    const projects = await Project.aggregate([
+      {
+        $match: {
+          status: "active",
+          $or: [{ deadline: { $exists: false } }, { deadline: { $gte: today } }],
+        },
+      },
+      {
+        $lookup: {
+          from: "facultyprofiles",
+          localField: "faculty_id",
+          foreignField: "_id",
+          as: "facultyProfile",
+        },
+      },
+      { $unwind: "$facultyProfile" },
+      {
+        $lookup: {
+          from: "users",
+          localField: "facultyProfile.user_id",
+          foreignField: "_id",
+          as: "facultyUser",
+        },
+      },
+      { $unwind: "$facultyUser" },
+      {
+        $project: {
+          id: { $toString: "$_id" },
+          title: 1,
+          description: 1,
+          research_area: 1,
+          positions: 1,
+          start_date: 1,
+          deadline: 1,
+          status: 1,
+          min_cgpa: 1,
+          eligibility: 1,
+          prerequisites: 1,
+          created_at: 1,
+          faculty_name: { $concat: ["$facultyUser.first_name", " ", "$facultyUser.last_name"] },
+          department: "$facultyProfile.department",
+          tags: { $ifNull: ["$tags", []] },
+        },
+      },
+      { $sort: { created_at: -1 } },
+    ])
 
     return projects as ProjectWithFaculty[]
   } catch (error) {
@@ -127,26 +182,60 @@ export async function getActiveProjects() {
 }
 
 // Get project by ID
-export async function getProjectById(id: number) {
+export async function getProjectById(id: number | string) {
   try {
-    const projects = await sql`
-      SELECT 
-        p.id, p.title, p.description, p.long_description, p.research_area, 
-        p.positions, p.start_date, p.deadline, p.status, p.min_cgpa, 
-        p.eligibility, p.prerequisites, p.created_at,
-        fp.id as faculty_id,
-        CONCAT(u.first_name, ' ', u.last_name) as faculty_name,
-        fp.department, fp.specialization,
-        GROUP_CONCAT(pt.tag) as tags,
-        u.email as faculty_email,
-        fp.bio as faculty_bio
-      FROM projects p
-      JOIN faculty_profiles fp ON p.faculty_id = fp.id
-      JOIN users u ON fp.user_id = u.id
-      LEFT JOIN project_tags pt ON p.id = pt.project_id
-      WHERE p.id = ${id}
-      GROUP BY p.id, fp.id, u.first_name, u.last_name, fp.department, fp.specialization, u.email, fp.bio
-    `
+    await connectToMongoDB()
+
+    const projectId = toObjectId(id)
+    if (!projectId) {
+      return null
+    }
+
+    const projects = await Project.aggregate([
+      { $match: { _id: projectId } },
+      {
+        $lookup: {
+          from: "facultyprofiles",
+          localField: "faculty_id",
+          foreignField: "_id",
+          as: "facultyProfile",
+        },
+      },
+      { $unwind: "$facultyProfile" },
+      {
+        $lookup: {
+          from: "users",
+          localField: "facultyProfile.user_id",
+          foreignField: "_id",
+          as: "facultyUser",
+        },
+      },
+      { $unwind: "$facultyUser" },
+      {
+        $project: {
+          id: { $toString: "$_id" },
+          title: 1,
+          description: 1,
+          long_description: 1,
+          research_area: 1,
+          positions: 1,
+          start_date: 1,
+          deadline: 1,
+          status: 1,
+          min_cgpa: 1,
+          eligibility: 1,
+          prerequisites: 1,
+          created_at: 1,
+          faculty_id: { $toString: "$facultyProfile._id" },
+          faculty_name: { $concat: ["$facultyUser.first_name", " ", "$facultyUser.last_name"] },
+          department: "$facultyProfile.department",
+          specialization: "$facultyProfile.specialization",
+          faculty_email: "$facultyUser.email",
+          faculty_bio: "$facultyProfile.bio",
+          tags: { $ifNull: ["$tags", []] },
+        },
+      },
+    ])
 
     if (projects.length === 0) {
       return null
@@ -162,6 +251,7 @@ export async function getProjectById(id: number) {
 // Get faculty projects
 export async function getFacultyProjects() {
   try {
+    await connectToMongoDB()
     const userResult = await getCurrentUser()
 
     if (!userResult.success) {
@@ -179,32 +269,46 @@ export async function getFacultyProjects() {
     const cached = cache.get<any[]>(cacheKey)
     if (cached) return cached
 
-    // Get faculty profile ID
-    const facultyProfiles = await sql`
-      SELECT id FROM faculty_profiles WHERE user_id = ${user.id}
-    `
-
-    if (facultyProfiles.length === 0) {
-      console.error(`Faculty profile not found for user_id: ${user.id}`);
+    const userId = toObjectId(user.id)
+    if (!userId) {
       return []
     }
 
-    const facultyId = facultyProfiles[0].id
+    // Get faculty profile
+    const facultyProfile = await FacultyProfile.findOne({ user_id: userId }).lean()
+    if (!facultyProfile) {
+      console.error(`Faculty profile not found for user_id: ${user.id}`)
+      return []
+    }
 
     // Get projects with application counts
-    const projects = await sql`
-      SELECT 
-        p.id, p.title, p.description, p.research_area, p.positions, 
-        p.start_date, p.deadline, p.status, p.created_at,
-        COUNT(a.id) as application_count,
-        GROUP_CONCAT(pt.tag) as tags
-      FROM projects p
-      LEFT JOIN applications a ON p.id = a.project_id
-      LEFT JOIN project_tags pt ON p.id = pt.project_id
-      WHERE p.faculty_id = ${facultyId}
-      GROUP BY p.id
-      ORDER BY p.created_at DESC
-    `
+    const projects = await Project.aggregate([
+      { $match: { faculty_id: facultyProfile._id } },
+      {
+        $lookup: {
+          from: "applications",
+          localField: "_id",
+          foreignField: "project_id",
+          as: "applications",
+        },
+      },
+      {
+        $project: {
+          id: { $toString: "$_id" },
+          title: 1,
+          description: 1,
+          research_area: 1,
+          positions: 1,
+          start_date: 1,
+          deadline: 1,
+          status: 1,
+          created_at: 1,
+          application_count: { $size: "$applications" },
+          tags: { $ifNull: ["$tags", []] },
+        },
+      },
+      { $sort: { created_at: -1 } },
+    ])
 
     cache.set(cacheKey, projects, 30) // cache for 30 seconds
     return projects
@@ -217,6 +321,7 @@ export async function getFacultyProjects() {
 // Create project action
 export async function createProject(data: ProjectFormData) {
   try {
+    await connectToMongoDB()
     const userResult = await getCurrentUser()
 
     if (!userResult.success) {
@@ -229,70 +334,39 @@ export async function createProject(data: ProjectFormData) {
       return { success: false, message: "Unauthorized" }
     }
 
-    // Get faculty profile ID
-    const facultyProfiles = await sql`
-      SELECT id FROM faculty_profiles WHERE user_id = ${user.id}
-    `
+    const userId = toObjectId(user.id)
+    if (!userId) {
+      return { success: false, message: "Invalid user ID" }
+    }
 
-    if (facultyProfiles.length === 0) {
-      console.error(`Faculty profile not found for user_id: ${user.id}`);
+    // Get faculty profile
+    const facultyProfile = await FacultyProfile.findOne({ user_id: userId })
+    if (!facultyProfile) {
+      console.error(`Faculty profile not found for user_id: ${user.id}`)
       return { success: false, message: "Faculty profile not found. Please contact admin." }
     }
 
-    const facultyId = facultyProfiles[0].id
+    // Create project
+    const project = await Project.create({
+      faculty_id: facultyProfile._id,
+      title: data.title,
+      description: data.longDescription || data.description, // Use longDescription if available, fallback to description
+      research_area: data.researchArea,
+      positions: data.positions,
+      start_date: new Date(data.startDate),
+      deadline: new Date(data.deadline),
+      status: data.status,
+      min_cgpa: String(data.minCgpa),
+      eligibility: data.eligibility,
+      prerequisites: data.prerequisites,
+      tags: data.tags || [],
+    })
 
-    // Transaction using mysql2/promise
-    const pool = getPool()
-    const connection = await pool.getConnection()
-    try {
-      await connection.beginTransaction()
-      // Create project
-      const [newProjectResult] = await connection.query(
-        `INSERT INTO projects (
-          faculty_id, title, description, long_description, research_area, 
-          positions, start_date, deadline, status, min_cgpa, 
-          eligibility, prerequisites
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          facultyId,
-          data.title,
-          data.description,
-          data.longDescription,
-          data.researchArea,
-          data.positions,
-          data.startDate,
-          data.deadline,
-          data.status,
-          data.minCgpa,
-          data.eligibility,
-          data.prerequisites,
-        ]
-      )
-      // @ts-ignore
-      const projectId = newProjectResult.insertId
+    revalidatePath("/dashboard/faculty")
+    revalidatePath("/dashboard/faculty/projects")
+    revalidatePath("/projects")
 
-      // Add tags
-      if (data.tags && data.tags.length > 0) {
-        for (const tag of data.tags) {
-          await connection.query(
-            `INSERT INTO project_tags (project_id, tag) VALUES (?, ?)`,
-            [projectId, tag]
-          )
-        }
-      }
-      await connection.commit()
-      connection.release()
-
-      revalidatePath("/dashboard/faculty")
-      revalidatePath("/dashboard/faculty/projects")
-      revalidatePath("/projects")
-
-      return { success: true, projectId }
-    } catch (err) {
-      await connection.rollback()
-      connection.release()
-      throw err
-    }
+    return { success: true, projectId: String(project._id) }
   } catch (error) {
     console.error("Create project error:", error)
     return { success: false, message: "An error occurred while creating the project" }
@@ -300,8 +374,9 @@ export async function createProject(data: ProjectFormData) {
 }
 
 // Update project action
-export async function updateProject(id: number, data: ProjectFormData) {
+export async function updateProject(id: number | string, data: ProjectFormData) {
   try {
+    await connectToMongoDB()
     const userResult = await getCurrentUser()
 
     if (!userResult.success) {
@@ -314,86 +389,43 @@ export async function updateProject(id: number, data: ProjectFormData) {
       return { success: false, message: "Unauthorized" }
     }
 
-    // Get faculty profile ID
-    const facultyProfiles = await sql`
-      SELECT id FROM faculty_profiles WHERE user_id = ${user.id}
-    `
+    const userId = toObjectId(user.id)
+    if (!userId) {
+      return { success: false, message: "Invalid user ID" }
+    }
 
-    if (facultyProfiles.length === 0) {
+    // Get faculty profile
+    const facultyProfile = await FacultyProfile.findOne({ user_id: userId })
+    if (!facultyProfile) {
       return { success: false, message: "Faculty profile not found" }
     }
 
-    const facultyId = facultyProfiles[0].id
+    const projectId = toObjectId(id)
+    if (!projectId) {
+      return { success: false, message: "Invalid project ID" }
+    }
 
     // Check if the project belongs to the faculty
-    const projects = await sql`
-      SELECT id FROM projects WHERE id = ${id} AND faculty_id = ${facultyId}
-    `
-
-    if (projects.length === 0) {
+    const project = await Project.findById(projectId)
+    if (!project || String(project.faculty_id) !== String(facultyProfile._id)) {
       return { success: false, message: "Project not found or you don't have permission to update it" }
     }
 
-    // Begin transaction
-    const pool = getPool()
-    const connection = await pool.getConnection()
-    try {
-      await connection.beginTransaction()
-      // Update project
-      await connection.query(
-        `UPDATE projects
-        SET 
-          title = ?,
-          description = ?,
-          long_description = ?,
-          research_area = ?,
-          positions = ?,
-          start_date = ?,
-          deadline = ?,
-          status = ?,
-          min_cgpa = ?,
-          eligibility = ?,
-          prerequisites = ?,
-          updated_at = CURRENT_TIMESTAMP
-        WHERE id = ?`,
-        [
-          data.title,
-          data.description,
-          data.longDescription,
-          data.researchArea,
-          data.positions,
-          data.startDate,
-          data.deadline,
-          data.status,
-          data.minCgpa,
-          data.eligibility,
-          data.prerequisites,
-          id,
-        ]
-      )
-
-      // Delete existing tags
-      await connection.query(
-        `DELETE FROM project_tags WHERE project_id = ?`,
-        [id]
-      )
-
-      // Add new tags
-      if (data.tags && data.tags.length > 0) {
-        for (const tag of data.tags) {
-          await connection.query(
-            `INSERT INTO project_tags (project_id, tag) VALUES (?, ?)`,
-            [id, tag]
-          )
-        }
-      }
-      await connection.commit()
-      connection.release()
-    } catch (err) {
-      await connection.rollback()
-      connection.release()
-      throw err
-    }
+    // Update project
+    await Project.findByIdAndUpdate(projectId, {
+      title: data.title,
+      description: data.longDescription || data.description,
+      research_area: data.researchArea,
+      positions: data.positions,
+      start_date: new Date(data.startDate),
+      deadline: new Date(data.deadline),
+      status: data.status,
+      min_cgpa: String(data.minCgpa),
+      eligibility: data.eligibility,
+      prerequisites: data.prerequisites,
+      tags: data.tags || [],
+      updated_at: new Date(),
+    })
 
     revalidatePath("/dashboard/faculty")
     revalidatePath("/dashboard/faculty/projects")
@@ -409,8 +441,9 @@ export async function updateProject(id: number, data: ProjectFormData) {
 }
 
 // Delete project action
-export async function deleteProject(id: number) {
+export async function deleteProject(id: number | string) {
   try {
+    await connectToMongoDB()
     const userResult = await getCurrentUser()
 
     if (!userResult.success) {
@@ -423,31 +456,33 @@ export async function deleteProject(id: number) {
       return { success: false, message: "Unauthorized" }
     }
 
-    // Get faculty profile ID
-    const facultyProfiles = await sql`
-      SELECT id FROM faculty_profiles WHERE user_id = ${user.id}
-    `
+    const userId = toObjectId(user.id)
+    if (!userId) {
+      return { success: false, message: "Invalid user ID" }
+    }
 
-    if (facultyProfiles.length === 0) {
+    // Get faculty profile
+    const facultyProfile = await FacultyProfile.findOne({ user_id: userId })
+    if (!facultyProfile) {
       return { success: false, message: "Faculty profile not found" }
     }
 
-    const facultyId = facultyProfiles[0].id
+    const projectId = toObjectId(id)
+    if (!projectId) {
+      return { success: false, message: "Invalid project ID" }
+    }
 
     // Check if the project belongs to the faculty
-    const projects = await sql`
-      SELECT id FROM projects WHERE id = ${id} AND faculty_id = ${facultyId}
-    `
-
-    if (projects.length === 0) {
+    const project = await Project.findById(projectId)
+    if (!project || String(project.faculty_id) !== String(facultyProfile._id)) {
       return { success: false, message: "Project not found or you don't have permission to delete it" }
     }
 
     // Check if there are any approved applications
-    const approvedApplications = await sql`
-      SELECT id FROM applications 
-      WHERE project_id = ${id} AND status = 'accepted'
-    `
+    const approvedApplications = await Application.find({
+      project_id: projectId,
+      status: "accepted",
+    })
 
     if (approvedApplications.length > 0) {
       return {
@@ -456,35 +491,11 @@ export async function deleteProject(id: number) {
       }
     }
 
-    // Begin transaction
-    const pool = getPool()
-    const connection = await pool.getConnection()
-    try {
-      await connection.beginTransaction()
-      // Delete applications
-      await connection.query(
-        `DELETE FROM applications WHERE project_id = ?`,
-        [id]
-      )
+    // Delete applications
+    await Application.deleteMany({ project_id: projectId })
 
-      // Delete tags
-      await connection.query(
-        `DELETE FROM project_tags WHERE project_id = ?`,
-        [id]
-      )
-
-      // Delete project
-      await connection.query(
-        `DELETE FROM projects WHERE id = ?`,
-        [id]
-      )
-      await connection.commit()
-      connection.release()
-    } catch (err) {
-      await connection.rollback()
-      connection.release()
-      throw err
-    }
+    // Delete project
+    await Project.findByIdAndDelete(projectId)
 
     revalidatePath("/dashboard/faculty")
     revalidatePath("/dashboard/faculty/projects")
@@ -498,8 +509,9 @@ export async function deleteProject(id: number) {
 }
 
 // Check if student has applied to project
-export async function hasStudentAppliedToProject(projectId: number) {
+export async function hasStudentAppliedToProject(projectId: number | string) {
   try {
+    await connectToMongoDB()
     const userResult = await getCurrentUser()
 
     if (!userResult.success) {
@@ -512,28 +524,31 @@ export async function hasStudentAppliedToProject(projectId: number) {
       return false
     }
 
-    // Get student profile ID
-    const studentProfiles = await sql`
-      SELECT id FROM student_profiles WHERE user_id = ${user.id}
-    `
-
-    if (studentProfiles.length === 0) {
+    const userId = toObjectId(user.id)
+    if (!userId) {
       return false
     }
 
-    const studentId = studentProfiles[0].id
+    // Get student profile
+    const studentProfile = await (await import("@/lib/models")).StudentProfile.findOne({ user_id: userId }).lean()
+    if (!studentProfile) {
+      return false
+    }
+
+    const projId = toObjectId(projectId)
+    if (!projId) {
+      return false
+    }
 
     // Check if student has applied
-    const applications = await sql`
-      SELECT id FROM applications 
-      WHERE project_id = ${projectId} AND student_id = ${studentId}
-    `
+    const application = await Application.findOne({
+      project_id: projId,
+      student_id: userId,
+    })
 
-    return applications.length > 0
+    return !!application
   } catch (error) {
     console.error("Check student application error:", error)
     return false
   }
 }
-
-

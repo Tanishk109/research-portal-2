@@ -1,238 +1,208 @@
-import mysql from "mysql2/promise"
-import bcrypt from "bcryptjs"
-import { DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME } from "./env"
+import { connectToMongoDB, checkMongoDBHealth, getMongoDBInfo } from "./mongodb";
+import bcrypt from "bcryptjs";
+import { ObjectId } from "mongodb";
+import mongoose from "mongoose";
 
-// Database configuration with persistent connection settings
-const dbConfig: mysql.PoolOptions = {
-  host: DB_HOST,
-  port: DB_PORT,
-  user: DB_USER,
-  password: DB_PASSWORD,
-  database: DB_NAME,
-  waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0,
-  charset: 'utf8mb4',
-  timezone: 'local',
-  // Keep connections alive to avoid drops
-  enableKeepAlive: true,
-  keepAliveInitialDelay: 0, // Start keep-alive immediately
-  // Connection timeout settings
-  connectTimeout: 60000, // 60 seconds to establish connection
-  // SSL configuration (if needed)
-  ssl: false,
-} as mysql.PoolOptions
-
-// Create connection pool as a global singleton to persist across hot reloads
-let pool: mysql.Pool | null = null
-let keepAliveInterval: NodeJS.Timeout | null = null
-
-// Function to ping database connections to keep them alive
-function startKeepAlive() {
-  if (keepAliveInterval) return // Already running
-  
-  // Ping database every 30 seconds to keep connections alive
-  keepAliveInterval = setInterval(async () => {
-    if (pool) {
-      try {
-        await pool.execute('SELECT 1')
-        // Only log in development mode to reduce noise
-        if (process.env.NODE_ENV === 'development') {
-          console.log('[DB] Keep-alive ping successful')
-        }
-      } catch (error) {
-        console.error('[DB] Keep-alive ping failed:', error)
-        // Connection might be dead, but pool will handle reconnection
-      }
-    }
-  }, 30000) // Every 30 seconds
+// Initialize MongoDB connection on import
+if (typeof window === "undefined") {
+  connectToMongoDB().catch(console.error);
 }
 
-function getPool() {
-  if (pool) {
-    // Start keep-alive if not already running
-    if (!keepAliveInterval) {
-      startKeepAlive()
-    }
-    return pool
-  }
-
-  const globalAny = globalThis as unknown as { __mysql_pool?: mysql.Pool }
-  if (globalAny.__mysql_pool) {
-    pool = globalAny.__mysql_pool
-    startKeepAlive()
-    return pool
-  }
-
-  pool = mysql.createPool(dbConfig)
-  
-  // Set up connection event handlers for better monitoring
-  pool.on('connection', (connection) => {
-    console.log('[DB] New connection established:', connection.threadId)
-    
-    // Set connection to auto-reconnect
-    connection.on('error', (err) => {
-      console.error('[DB] Connection error:', err)
-      if (err.code === 'PROTOCOL_CONNECTION_LOST' || err.code === 'ECONNRESET') {
-        console.log('[DB] Connection lost, will reconnect automatically')
-      }
-    })
-  })
-
-  pool.on('acquire', (connection) => {
-    // Connection acquired from pool
-  })
-
-  pool.on('release', (connection) => {
-    // Connection released back to pool
-  })
-
-  pool.on('error', (err) => {
-    console.error('[DB] Pool error:', err)
-    // Pool will handle reconnection automatically
-  })
-
-  if (process.env.NODE_ENV !== 'production') {
-    globalAny.__mysql_pool = pool
-  }
-  
-  // Start keep-alive mechanism
-  startKeepAlive()
-  
-  return pool
-}
-
-// Export getPool function
-export { getPool }
-
-// SQL template function to mimic Neon's interface
-export function sql(strings: TemplateStringsArray, ...values: any[]) {
-  const query = strings.reduce((result, string, i) => {
-    return result + string + (values[i] !== undefined ? "?" : "")
-  }, "")
-
-  const params = values.filter((v) => v !== undefined)
-
-  return executeQuery(query, params)
-}
-
-// Add unsafe method for dynamic queries
-sql.unsafe = (query: string, params: any[] = []) => {
-  return executeQuery(query, params)
-}
-
-// Execute query function with automatic reconnection
-async function executeQuery(query: string, params: any[] = [], retries = 3): Promise<any[]> {
-  const pool = getPool()
-  
-  for (let attempt = 1; attempt <= retries; attempt++) {
-    try {
-      const [rows] = await pool.execute(query, params)
-      return rows as any[]
-    } catch (error: any) {
-      const isConnectionError = 
-        error.code === 'PROTOCOL_CONNECTION_LOST' ||
-        error.code === 'ECONNRESET' ||
-        error.code === 'ETIMEDOUT' ||
-        error.code === 'ENOTFOUND' ||
-        error.fatal === true
-
-      if (isConnectionError && attempt < retries) {
-        console.warn(`[DB] Connection error (attempt ${attempt}/${retries}), retrying...`, error.code)
-        // Wait before retrying (exponential backoff)
-        await new Promise(resolve => setTimeout(resolve, 1000 * attempt))
-        continue
-      }
-      
-      console.error("Database query error:", error)
-      throw error
-    }
-  }
-  
-  throw new Error("Failed to execute query after retries")
-}
-
-// Password utilities
+// Password utilities (unchanged)
 export async function hashPassword(password: string): Promise<string> {
   try {
-    const saltRounds = 10
-    return await bcrypt.hash(password, saltRounds)
+    const saltRounds = 10;
+    return await bcrypt.hash(password, saltRounds);
   } catch (error) {
-    console.error("Password hashing failed:", error)
-    throw new Error("Failed to hash password")
+    console.error("Password hashing failed:", error);
+    throw new Error("Failed to hash password");
   }
 }
 
 export async function comparePassword(password: string, hashedPassword: string): Promise<boolean> {
   try {
-    return await bcrypt.compare(password, hashedPassword)
+    return await bcrypt.compare(password, hashedPassword);
   } catch (error) {
-    console.error("Password comparison failed:", error)
-    return false
+    console.error("Password comparison failed:", error);
+    return false;
   }
 }
 
 // Database health check
-export async function checkDatabaseHealth() {
+export async function checkDatabaseHealth(): Promise<boolean> {
   try {
-    const result = await sql`SELECT 1 as health_check`
-    return result[0].health_check === 1
+    return await checkMongoDBHealth();
   } catch (error) {
-    console.error("Database health check failed:", error)
-    return false
+    console.error("Database health check failed:", error);
+    return false;
   }
 }
 
 // Get database info
 export async function getDatabaseInfo() {
   try {
-    const result = await sql`
-      SELECT 
-        DATABASE() as database_name,
-        USER() as user,
-        VERSION() as version,
-        NOW() as timestamp
-    `
-    return result[0]
+    return await getMongoDBInfo();
   } catch (error) {
-    console.error("Failed to get database info:", error)
-    throw error
+    console.error("Failed to get database info:", error);
+    throw error;
   }
 }
 
 // Test database connection
-export async function testDatabaseConnection() {
+export async function testDatabaseConnection(): Promise<boolean> {
   try {
-    const connection = getPool()
-    await connection.execute("SELECT 1")
-    return true
+    return await checkMongoDBHealth();
   } catch (error) {
-    console.error("Database connection test failed:", error)
-    return false
+    console.error("Database connection test failed:", error);
+    return false;
   }
 }
 
 // Close database connection
-export async function closeDatabaseConnection() {
-  if (keepAliveInterval) {
-    clearInterval(keepAliveInterval)
-    keepAliveInterval = null
-  }
-  
-  if (pool) {
-    await pool.end()
-    pool = null
-    
-    // Clear global pool reference
-    const globalAny = globalThis as unknown as { __mysql_pool?: mysql.Pool }
-    if (globalAny.__mysql_pool) {
-      delete globalAny.__mysql_pool
-    }
-  }
+export async function closeDatabaseConnection(): Promise<void> {
+  const { disconnectFromMongoDB } = await import("./mongodb");
+  await disconnectFromMongoDB();
 }
 
-// Initialize connection pool on module load
-if (typeof window === 'undefined') {
-  // Only run on server-side
-  getPool()
+// SQL-like interface for compatibility
+// This provides a compatibility layer for existing code
+export function sql(strings: TemplateStringsArray, ...values: any[]): Promise<any[]> {
+  throw new Error(
+    "SQL queries are not supported with MongoDB. Please use Mongoose models directly. " +
+    "Import models from '@/lib/models' and use them instead of sql template literals."
+  );
+}
+
+// Add unsafe method for dynamic queries (not supported)
+sql.unsafe = (query: string, params: any[] = []) => {
+  throw new Error(
+    "SQL queries are not supported with MongoDB. Please use Mongoose models directly."
+  );
+};
+
+// Helper function to convert MongoDB ObjectId to string or number
+export function toId(value: string | ObjectId | number | undefined): string | number | undefined {
+  if (!value) return undefined;
+  if (value instanceof ObjectId) return value.toString();
+  if (typeof value === "string" && ObjectId.isValid(value)) return value;
+  if (typeof value === "number") return value;
+  return String(value);
+}
+
+// Helper function to convert to MongoDB ObjectId
+export function toObjectId(value: string | ObjectId | number | undefined): ObjectId | undefined {
+  if (!value) return undefined;
+  if (value instanceof ObjectId) return value;
+  if (typeof value === "string" && ObjectId.isValid(value)) return new ObjectId(value);
+  if (typeof value === "number") return new ObjectId(value.toString());
+  return undefined;
+}
+
+// Helper to convert MongoDB document to plain object with id
+export function toPlainObject(doc: any): any {
+  if (!doc) return null;
+  if (Array.isArray(doc)) {
+    return doc.map(toPlainObject);
+  }
+  
+  // Handle Mongoose documents
+  if (doc.toObject) {
+    const obj = doc.toObject();
+    return convertObjectIds(obj);
+  }
+  
+  // Handle plain objects (from .lean())
+  if (typeof doc === 'object') {
+    return convertObjectIds({ ...doc });
+  }
+  
+  return doc;
+}
+
+// Helper to recursively convert ObjectId fields to strings
+function convertObjectIds(obj: any): any {
+  if (!obj || typeof obj !== 'object') {
+    return obj;
+  }
+  
+  if (Array.isArray(obj)) {
+    return obj.map(convertObjectIds);
+  }
+  
+  // Check if it's an ObjectId instance (MongoDB or Mongoose)
+  if (obj instanceof ObjectId || (obj.constructor && (obj.constructor.name === 'ObjectId' || obj.constructor.name === 'ObjectID'))) {
+    return obj.toString();
+  }
+  
+  // Check if it's a Mongoose ObjectId (has toHexString method)
+  if (mongoose.Types.ObjectId.isValid(obj) && typeof obj.toHexString === 'function') {
+    return obj.toString();
+  }
+  
+  // Check if it has ObjectId-like properties (buffer property indicates ObjectId)
+  if (obj.buffer && typeof obj.toString === 'function' && !(obj instanceof Date)) {
+    return obj.toString();
+  }
+  
+  const result: any = {};
+  
+  for (const key in obj) {
+    if (obj.hasOwnProperty(key)) {
+      const value = obj[key];
+      
+      // Skip __v (Mongoose version key)
+      if (key === '__v') {
+        continue;
+      }
+      
+      // Convert _id to id
+      if (key === '_id') {
+        if (value) {
+          if (value instanceof ObjectId || mongoose.Types.ObjectId.isValid(value)) {
+            result.id = value.toString();
+          } else {
+            result.id = String(value);
+          }
+        }
+        continue;
+      }
+      
+      // Convert other ObjectId fields
+      if (value && typeof value === 'object') {
+        if (value instanceof ObjectId || mongoose.Types.ObjectId.isValid(value)) {
+          result[key] = value.toString();
+        } else if (Array.isArray(value)) {
+          result[key] = value.map(convertObjectIds);
+        } else if (value instanceof Date) {
+          result[key] = value.toISOString();
+        } else {
+          result[key] = convertObjectIds(value);
+        }
+      } else if (value instanceof Date) {
+        result[key] = value.toISOString();
+      } else {
+        result[key] = value;
+      }
+    }
+  }
+  
+  return result;
+}
+
+// Export getPool for compatibility (returns MongoDB connection)
+export function getPool() {
+  return {
+    execute: async (query: string, params: any[]) => {
+      throw new Error("SQL queries not supported. Use Mongoose models instead.");
+    },
+    getConnection: async () => {
+      await connectToMongoDB();
+      return {
+        execute: async (query: string, params: any[]) => {
+          throw new Error("SQL queries not supported. Use Mongoose models instead.");
+        },
+        release: () => {},
+      };
+    },
+  };
 }

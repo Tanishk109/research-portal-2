@@ -1,11 +1,15 @@
 import type { NextRequest } from "next/server"
-import { sql } from "@/lib/db"
+import { connectToMongoDB } from "@/lib/mongodb"
+import { User } from "@/lib/models"
 import { createApiResponse, handleApiError, parseJsonBody, validateRequiredFields } from "@/lib/api-utils"
 import { cache } from '@/lib/cache'
+import { hashPassword, toPlainObject } from "@/lib/db"
+import { FacultyProfile, StudentProfile } from "@/lib/models"
 
 // GET /api/users - Get all users
 export async function GET(request: NextRequest) {
   try {
+    await connectToMongoDB()
     // Get query parameters
     const { searchParams } = new URL(request.url)
     const role = searchParams.get("role")
@@ -28,44 +32,32 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // Base query
-    let query = `
-      SELECT 
-        u.id, u.role, u.first_name, u.last_name, u.email, u.created_at, u.updated_at
-      FROM 
-        users u
-    `
-
-    // Add role filter if provided
-    const params: any[] = []
+    // Build query
+    const query: any = {}
     if (role) {
-      query += ` WHERE u.role = $1`
-      params.push(role)
+      query.role = role
     }
 
-    // Add pagination
-    query += ` ORDER BY u.created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`
-    params.push(limit, offset)
-
-    // Execute query
-    const users = await sql(query, params)
+    // Get users with pagination
+    const users = await User.find(query)
+      .sort({ created_at: -1 })
+      .skip(offset)
+      .limit(limit)
+      .lean()
 
     // Get total count for pagination
-    const countResult = await sql(
-      `
-      SELECT COUNT(*) as total FROM users ${role ? `WHERE role = $1` : ""}
-    `,
-      role ? [role] : [],
-    )
+    const total = await User.countDocuments(query)
+
+    const usersPlain = users.map(toPlainObject)
 
     // Set cache for 30 seconds
-    cache.set(cacheKey, users, 30)
-    cache.set(cacheCountKey, Number.parseInt(countResult[0].total), 30)
+    cache.set(cacheKey, usersPlain, 30)
+    cache.set(cacheCountKey, total, 30)
 
     return createApiResponse(true, "Users retrieved successfully", {
-      users,
+      users: usersPlain,
       pagination: {
-        total: Number.parseInt(countResult[0].total),
+        total,
         limit,
         offset,
       },
@@ -78,6 +70,7 @@ export async function GET(request: NextRequest) {
 // POST /api/users - Create a new user
 export async function POST(request: NextRequest) {
   try {
+    await connectToMongoDB()
     const body = await parseJsonBody<{
       role: string
       first_name: string
@@ -124,53 +117,45 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if email already exists
-    const existingUser = await sql`
-      SELECT id FROM users WHERE email = ${body.email}
-    `
+    const existingUser = await User.findOne({ email: body.email })
 
-    if (existingUser.length > 0) {
+    if (existingUser) {
       return createApiResponse(false, "Email already in use")
     }
 
-    // Start a transaction
-    const result = await sql.begin(async (sql) => {
-      // Hash password
-      const bcrypt = require("bcryptjs")
-      const hashedPassword = await bcrypt.hash(body.password, 10)
+    // Hash password
+    const hashedPassword = await hashPassword(body.password)
 
-      // Insert user
-      const user = await sql`
-        INSERT INTO users (
-          role, first_name, last_name, email, password_hash
-        ) VALUES (
-          ${body.role}, ${body.first_name}, ${body.last_name}, ${body.email}, ${hashedPassword}
-        ) RETURNING id, role, first_name, last_name, email, created_at, updated_at
-      `
-
-      // Insert role-specific profile
-      if (body.role === "faculty") {
-        await sql`
-          INSERT INTO faculty_profiles (
-            user_id, faculty_id, department, specialization, date_of_joining, date_of_birth
-          ) VALUES (
-            ${user[0].id}, ${body.faculty_id}, ${body.department}, ${body.specialization}, 
-            ${body.date_of_joining}, ${body.date_of_birth}
-          )
-        `
-      } else if (body.role === "student") {
-        await sql`
-          INSERT INTO student_profiles (
-            user_id, registration_number, department, year, cgpa
-          ) VALUES (
-            ${user[0].id}, ${body.registration_number}, ${body.department}, ${body.year}, ${body.cgpa}
-          )
-        `
-      }
-
-      return user[0]
+    // Create user
+    const user = await User.create({
+      role: body.role as "faculty" | "student",
+      first_name: body.first_name,
+      last_name: body.last_name,
+      email: body.email,
+      password_hash: hashedPassword,
     })
 
-    return createApiResponse(true, "User created successfully", { user: result })
+    // Create role-specific profile
+    if (body.role === "faculty") {
+      await FacultyProfile.create({
+        user_id: user._id,
+        faculty_id: body.faculty_id!,
+        department: body.department!,
+        specialization: body.specialization!,
+        date_of_joining: new Date(body.date_of_joining!),
+        date_of_birth: new Date(body.date_of_birth!),
+      })
+    } else if (body.role === "student") {
+      await StudentProfile.create({
+        user_id: user._id,
+        registration_number: body.registration_number!,
+        department: body.department!,
+        year: body.year!,
+        cgpa: body.cgpa!,
+      })
+    }
+
+    return createApiResponse(true, "User created successfully", { user: toPlainObject(user) })
   } catch (error) {
     return handleApiError(error)
   }

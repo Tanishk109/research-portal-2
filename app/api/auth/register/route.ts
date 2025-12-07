@@ -1,7 +1,8 @@
 import type { NextRequest } from "next/server"
-import { sql } from "@/lib/db"
-import { createApiResponse, handleApiError } from "@/lib/api-utils"
-import { hashPassword } from "@/lib/db"
+import { NextResponse } from "next/server"
+import { connectToMongoDB } from "@/lib/mongodb"
+import { User, FacultyProfile, StudentProfile, LoginActivity } from "@/lib/models"
+import { hashPassword, toPlainObject } from "@/lib/db"
 import { SignJWT } from "jose"
 import { nanoid } from "nanoid"
 import { JWT_SECRET, JWT_EXPIRATION, COOKIE_SETTINGS } from "@/lib/env"
@@ -10,6 +11,7 @@ import { cookies } from "next/headers"
 // POST /api/auth/register - Register a new user
 export async function POST(request: NextRequest) {
   try {
+    await connectToMongoDB()
     console.log("Registration request received")
     const body = await request.json()
 
@@ -39,107 +41,124 @@ export async function POST(request: NextRequest) {
     // Validate required fields
     if (!role || !firstName || !lastName || !email || !password) {
       console.log("Missing required fields")
-      return createApiResponse(false, null, undefined, "All required fields must be provided")
+      return NextResponse.json(
+        {
+          success: false,
+          message: "All required fields must be provided",
+        },
+        { status: 400 }
+      )
     }
 
     // Validate role-specific fields
     if (role === "faculty") {
       if (!facultyId || !department || !specialization || !dateOfJoining || !dateOfBirth) {
         console.log("Missing faculty-specific fields")
-        return createApiResponse(false, null, undefined, "All faculty fields are required")
+        return NextResponse.json(
+          {
+            success: false,
+            message: "All faculty fields are required",
+          },
+          { status: 400 }
+        )
       }
     } else if (role === "student") {
       if (!registrationNumber || !department || !year || !cgpa) {
         console.log("Missing student-specific fields")
-        return createApiResponse(false, null, undefined, "All student fields are required")
+        return NextResponse.json(
+          {
+            success: false,
+            message: "All student fields are required",
+          },
+          { status: 400 }
+        )
       }
     } else {
       console.log(`Invalid role: ${role}`)
-      return createApiResponse(false, null, undefined, "Invalid role specified")
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Invalid role specified",
+        },
+        { status: 400 }
+      )
     }
 
-    // Check if email already exists
+    // Check if email already exists (case-insensitive)
     console.log("Checking if email already exists...")
-    const existingUsers = await sql`
-      SELECT id FROM users WHERE email = ${email}
-    `
+    const existingUser = await User.findOne({
+      email: { $regex: new RegExp(`^${email.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }
+    })
 
-    if (existingUsers.length > 0) {
+    if (existingUser) {
       console.log(`Email already exists: ${email}`)
-      return createApiResponse(false, null, undefined, "Email address is already registered")
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Email address is already registered",
+        },
+        { status: 400 }
+      )
     }
 
     // Hash password
     console.log("Hashing password...")
     const hashedPassword = await hashPassword(password)
 
-      // Insert user
-      console.log("Inserting user...")
-      const users = await sql`
-        INSERT INTO users (
-          role, first_name, last_name, email, password_hash, created_at, updated_at
-        ) VALUES (
-          ${role}, ${firstName}, ${lastName}, ${email}, ${hashedPassword}, 
-          CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
-      )
-    `
+    // Create user
+    console.log("Inserting user...")
+    const user = await User.create({
+      role: role as "faculty" | "student",
+      first_name: firstName,
+      last_name: lastName,
+      email: email.toLowerCase(), // Store email in lowercase for consistency
+      password_hash: hashedPassword,
+    })
 
-    // Get the inserted user ID
-    const insertedUser = await sql`
-      SELECT id, role, first_name, last_name, email, created_at 
-      FROM users 
-      WHERE email = ${email}
-    `
-    const user = insertedUser[0]
-      console.log(`User created with ID: ${user.id}`)
+    console.log(`User created with ID: ${user._id}`)
 
-      // Insert role-specific profile
-      if (role === "faculty") {
-        console.log("Creating faculty profile...")
-        await sql`
-          INSERT INTO faculty_profiles (
-            user_id, faculty_id, department, specialization, 
-            date_of_joining, date_of_birth, created_at, updated_at
-          ) VALUES (
-            ${user.id}, ${facultyId}, ${department}, ${specialization}, 
-            ${dateOfJoining}, ${dateOfBirth}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
-          )
-        `
-      } else if (role === "student") {
-        console.log("Creating student profile...")
-        await sql`
-          INSERT INTO student_profiles (
-            user_id, registration_number, department, year, cgpa, 
-            created_at, updated_at
-          ) VALUES (
-            ${user.id}, ${registrationNumber}, ${department}, ${year}, 
-            ${Number.parseFloat(cgpa)}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
-          )
-        `
-      }
+    // Create role-specific profile
+    if (role === "faculty") {
+      console.log("Creating faculty profile...")
+      await FacultyProfile.create({
+        user_id: user._id,
+        faculty_id: facultyId,
+        department,
+        specialization,
+        date_of_joining: new Date(dateOfJoining),
+        date_of_birth: new Date(dateOfBirth),
+      })
+    } else if (role === "student") {
+      console.log("Creating student profile...")
+      await StudentProfile.create({
+        user_id: user._id,
+        registration_number: registrationNumber,
+        department,
+        year,
+        cgpa: Number.parseFloat(cgpa),
+      })
+    }
 
-      // Record login activity
-      console.log("Recording login activity...")
-      await sql`
-        INSERT INTO login_activity (
-          user_id, timestamp, ip_address, user_agent, success, device_type
-        ) VALUES (
-          ${user.id}, CURRENT_TIMESTAMP, ${ipAddress || "unknown"}, 
-          ${userAgent || "unknown"}, true, 'Web'
-        )
-      `
-
-    const result = user
+    // Record login activity
+    console.log("Recording login activity...")
+    await LoginActivity.create({
+      user_id: user._id,
+      timestamp: new Date(),
+      ip_address: ipAddress || "unknown",
+      user_agent: userAgent || "unknown",
+      success: true,
+      device_type: "Web",
+    })
 
     console.log("Transaction completed successfully")
 
     // Create JWT token
     console.log("Creating JWT token...")
     const token = await new SignJWT({
-      id: result.id,
-      role: result.role,
-      email: result.email,
-      name: `${result.first_name} ${result.last_name}`,
+      id: user._id.toString(),
+      role: user.role,
+      email: user.email,
+      name: `${user.first_name} ${user.last_name}`,
     })
       .setProtectedHeader({ alg: "HS256" })
       .setJti(nanoid())
@@ -151,20 +170,31 @@ export async function POST(request: NextRequest) {
     console.log("Setting session cookie...")
     cookies().set("session", token, COOKIE_SETTINGS)
 
-    console.log(`Registration successful for user: ${result.id}`)
+    console.log(`Registration successful for user: ${user._id}`)
 
-    return createApiResponse(true, {
-      user: {
-        id: result.id,
-        role: result.role,
-        firstName: result.first_name,
-        lastName: result.last_name,
-        email: result.email,
-        name: `${result.first_name} ${result.last_name}`,
+    return NextResponse.json({
+      success: true,
+      message: "Registration successful",
+      data: {
+        user: {
+          id: user._id.toString(),
+          role: user.role,
+          firstName: user.first_name,
+          lastName: user.last_name,
+          email: user.email,
+          name: `${user.first_name} ${user.last_name}`,
+        },
       },
-    }, "Registration successful")
+    })
   } catch (error) {
     console.error("Registration error:", error)
-    return handleApiError(error, "Registration failed")
+    return NextResponse.json(
+      {
+        success: false,
+        message: "Registration failed",
+        error: error instanceof Error ? error.message : "Unknown error",
+      },
+      { status: 500 }
+    )
   }
 }
