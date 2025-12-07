@@ -132,27 +132,31 @@ export default function LoginPage() {
         userAgent: navigator.userAgent,
       })
 
-      console.log("Login response:", response)
+      console.log("Login response:", JSON.stringify(response, null, 2))
 
-      if (response.success) {
+      // Check if response has success property
+      if (response && response.success === true) {
+        console.log("Login successful, redirecting...")
         toast({
           title: "Login successful",
           description: "Welcome back to the Research Portal",
         })
 
-        // Small delay to ensure cookie is set
-        setTimeout(() => {
-          // Redirect based on role from response or form
-          const userRole = response.data?.user?.role || role
-          router.push(`/dashboard/${userRole}`)
-        }, 100)
+        // Get user role from response
+        const userRole = response.data?.user?.role || response.data?.role || role
+        console.log(`Redirecting to dashboard/${userRole}`)
+
+        // Use window.location for more reliable redirect with cookie
+        window.location.href = `/dashboard/${userRole}`
       } else {
-        console.error("Login failed - response:", response)
+        console.error("Login failed - response:", JSON.stringify(response, null, 2))
+        const errorMessage = response?.message || response?.error || "Invalid email or password"
         toast({
           title: "Login failed",
-          description: response.message || response.error || "Invalid email or password",
+          description: errorMessage,
           variant: "destructive",
         })
+        setIsLoading(false)
       }
     } catch (error) {
       console.error("Login error:", error)

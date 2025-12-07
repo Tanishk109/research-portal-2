@@ -42,41 +42,49 @@ export async function apiRequest<T = any>(endpoint: string, options: ApiRequestO
     const contentType = response.headers.get("content-type")
     const isJson = contentType?.includes("application/json")
 
-    if (!response.ok) {
-      if (isJson) {
-        const errorData = await response.json()
-        return {
-          success: false,
-          error: errorData.error || errorData.message || `HTTP ${response.status}`,
-          message: errorData.message,
-        }
-      } else {
+    // Parse response
+    let responseData: any = null
+    if (isJson) {
+      try {
+        responseData = await response.json()
+      } catch (e) {
+        console.error("Failed to parse JSON response:", e)
         const textError = await response.text()
         return {
           success: false,
-          error: textError || `HTTP ${response.status}: ${response.statusText}`,
-          message: `Request failed with status ${response.status}`,
+          error: `Failed to parse response: ${textError}`,
+          message: "Invalid response from server",
         }
+      }
+    } else {
+      responseData = await response.text()
+    }
+
+    if (!response.ok) {
+      return {
+        success: false,
+        error: responseData?.error || responseData?.message || `HTTP ${response.status}`,
+        message: responseData?.message || `Request failed with status ${response.status}`,
+        data: responseData,
       }
     }
 
-    if (isJson) {
-      const data = await response.json()
-      // Ensure the response has the expected structure
-      if (data && typeof data === 'object') {
-        return data
+    // Success response
+    if (isJson && responseData) {
+      // If response already has success property, return as-is
+      if (typeof responseData === 'object' && 'success' in responseData) {
+        return responseData
       }
-      // If response is not in expected format, wrap it
-      return {
-        success: response.ok,
-        data: data,
-        message: response.ok ? "Request successful" : "Request failed"
-      }
-    } else {
-      const textData = await response.text()
+      // Otherwise wrap it
       return {
         success: true,
-        data: textData as T,
+        data: responseData,
+        message: responseData?.message || "Request successful",
+      }
+    } else {
+      return {
+        success: true,
+        data: responseData as T,
         message: "Request completed successfully",
       }
     }

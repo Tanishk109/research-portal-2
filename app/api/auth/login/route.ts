@@ -117,7 +117,11 @@ export async function POST(request: NextRequest) {
       sameSite: "lax",
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
       path: "/",
+      // Don't set domain - let browser handle it
     })
+    
+    // Also set a header to indicate cookie was set (for debugging)
+    response.headers.set("X-Session-Set", "true")
 
     console.log("Cookie set successfully for user:", user._id.toString())
 
