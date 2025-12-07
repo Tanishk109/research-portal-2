@@ -132,26 +132,34 @@ export default function LoginPage() {
         userAgent: navigator.userAgent,
       })
 
+      console.log("Login response:", response)
+
       if (response.success) {
         toast({
           title: "Login successful",
           description: "Welcome back to the Research Portal",
         })
 
-        // Redirect based on role
-        router.push(`/dashboard/${role}`)
+        // Small delay to ensure cookie is set
+        setTimeout(() => {
+          // Redirect based on role from response or form
+          const userRole = response.data?.user?.role || role
+          router.push(`/dashboard/${userRole}`)
+        }, 100)
       } else {
+        console.error("Login failed - response:", response)
         toast({
           title: "Login failed",
-          description: response.message || "Invalid email or password",
+          description: response.message || response.error || "Invalid email or password",
           variant: "destructive",
         })
       }
     } catch (error) {
       console.error("Login error:", error)
+      const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred"
       toast({
         title: "Login failed",
-        description: "An unexpected error occurred",
+        description: errorMessage,
         variant: "destructive",
       })
     } finally {

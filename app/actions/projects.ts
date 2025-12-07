@@ -346,7 +346,7 @@ export async function createProject(data: ProjectFormData) {
       return { success: false, message: "Faculty profile not found. Please contact admin." }
     }
 
-    // Create project
+      // Create project
     const project = await Project.create({
       faculty_id: facultyProfile._id,
       title: data.title,
@@ -362,9 +362,9 @@ export async function createProject(data: ProjectFormData) {
       tags: data.tags || [],
     })
 
-    revalidatePath("/dashboard/faculty")
-    revalidatePath("/dashboard/faculty/projects")
-    revalidatePath("/projects")
+      revalidatePath("/dashboard/faculty")
+      revalidatePath("/dashboard/faculty/projects")
+      revalidatePath("/projects")
 
     return { success: true, projectId: String(project._id) }
   } catch (error) {
@@ -411,7 +411,7 @@ export async function updateProject(id: number | string, data: ProjectFormData) 
       return { success: false, message: "Project not found or you don't have permission to update it" }
     }
 
-    // Update project
+      // Update project
     await Project.findByIdAndUpdate(projectId, {
       title: data.title,
       description: data.longDescription || data.description,
@@ -491,10 +491,10 @@ export async function deleteProject(id: number | string) {
       }
     }
 
-    // Delete applications
+      // Delete applications
     await Application.deleteMany({ project_id: projectId })
 
-    // Delete project
+      // Delete project
     await Project.findByIdAndDelete(projectId)
 
     revalidatePath("/dashboard/faculty")

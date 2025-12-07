@@ -91,9 +91,7 @@ export async function POST(request: NextRequest) {
       .sign(new TextEncoder().encode(JWT_SECRET))
 
     // Set cookie
-    cookies().set("session", token, COOKIE_SETTINGS)
-
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       message: "Login successful",
       data: {
@@ -108,6 +106,19 @@ export async function POST(request: NextRequest) {
         },
       },
     })
+
+    // Set cookie on the response
+    response.cookies.set("session", token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      path: "/",
+    })
+
+    console.log("Cookie set successfully for user:", user._id.toString())
+
+    return response
   } catch (error) {
     console.error("Login error:", error)
     return NextResponse.json(

@@ -60,4 +60,4 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
   } catch (error) {
     return handleApiError(error)
   }
-}
+} 

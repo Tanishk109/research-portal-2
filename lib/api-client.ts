@@ -62,7 +62,16 @@ export async function apiRequest<T = any>(endpoint: string, options: ApiRequestO
 
     if (isJson) {
       const data = await response.json()
-      return data
+      // Ensure the response has the expected structure
+      if (data && typeof data === 'object') {
+        return data
+      }
+      // If response is not in expected format, wrap it
+      return {
+        success: response.ok,
+        data: data,
+        message: response.ok ? "Request successful" : "Request failed"
+      }
     } else {
       const textData = await response.text()
       return {

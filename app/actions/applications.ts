@@ -92,7 +92,7 @@ export async function applyToProject(data: ApplicationFormData) {
 export async function getStudentApplications(limit = 10, offset = 0) {
   const safeLimit = Math.max(1, Math.min(100, Number(limit) || 10))
   const safeOffset = Math.max(0, Number(offset) || 0)
-
+  
   try {
     await connectToMongoDB()
     const userResult = await getCurrentUser()
@@ -175,7 +175,7 @@ export async function getStudentApplications(limit = 10, offset = 0) {
 export async function getFacultyApplications(limit = 10, offset = 0) {
   const safeLimit = Math.max(1, Math.min(100, Number(limit) || 10))
   const safeOffset = Math.max(0, Number(offset) || 0)
-
+  
   try {
     await connectToMongoDB()
     const userResult = await getCurrentUser()

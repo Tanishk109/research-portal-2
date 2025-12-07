@@ -76,7 +76,7 @@ export default function ApplicationDetailsPage({ params }: { params: { id: strin
     }
 
     if (id) {
-      fetchData()
+    fetchData()
     }
   }, [id, toast])
 

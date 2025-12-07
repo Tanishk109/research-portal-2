@@ -41,12 +41,13 @@ export default function StudentProfilePage() {
   })
   const [profileCompletion, setProfileCompletion] = useState(65)
   const [uploadedCV, setUploadedCV] = useState<File | null>(null)
-  const [certificates, setCertificates] = useState([
-    { id: 1, name: "Python Programming Certificate", type: "Technical", date: "2022-05-15" },
-    { id: 2, name: "Best Student Award", type: "Academic", date: "2023-01-10" },
-  ])
-  const [skills, setSkills] = useState(["Python", "Machine Learning", "Data Analysis", "Java", "Web Development"])
+  const [cvData, setCvData] = useState<{ file_url?: string; uploaded_at?: string } | null>(null)
+  const [certificates, setCertificates] = useState<Array<{ id: string; name: string; file_url?: string; uploaded_at?: string }>>([])
+  const [skills, setSkills] = useState<string[]>([])
   const [newSkill, setNewSkill] = useState("")
+  const [savingCV, setSavingCV] = useState(false)
+  const [savingCertificates, setSavingCertificates] = useState(false)
+  const [savingSkills, setSavingSkills] = useState(false)
 
   const { data, error, isLoading: swrLoading } = useSWR("/api/dashboard/student/profile", fetcher, { refreshInterval: 30000 })
 
@@ -88,7 +89,56 @@ export default function StudentProfilePage() {
     }
 
     loadProfile()
+    loadCV()
+    loadCertificates()
+    loadSkills()
   }, [toast])
+
+  // Load CV data
+  const loadCV = async () => {
+    try {
+      const res = await fetch("/api/dashboard/student/cv")
+      const result = await res.json()
+      if (res.ok && result.success) {
+        if (result.data) {
+          setCvData(result.data)
+        }
+      }
+    } catch (error) {
+      console.error("Error loading CV:", error)
+    }
+  }
+
+  // Load certificates
+  const loadCertificates = async () => {
+    try {
+      const res = await fetch("/api/dashboard/student/certificates")
+      const result = await res.json()
+      if (res.ok && result.success && result.data) {
+        setCertificates(result.data.map((cert: any) => ({
+          id: cert.id,
+          name: cert.name,
+          file_url: cert.file_url,
+          uploaded_at: cert.uploaded_at
+        })))
+      }
+    } catch (error) {
+      console.error("Error loading certificates:", error)
+    }
+  }
+
+  // Load skills
+  const loadSkills = async () => {
+    try {
+      const res = await fetch("/api/dashboard/student/skills")
+      const result = await res.json()
+      if (res.ok && result.success && result.data) {
+        setSkills(result.data)
+      }
+    } catch (error) {
+      console.error("Error loading skills:", error)
+    }
+  }
 
   const handleSaveProfile = async () => {
     setSaving(true)
@@ -123,29 +173,119 @@ export default function StudentProfilePage() {
     }
   }
 
-  const handleCVUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleCVUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      setUploadedCV(e.target.files[0])
-      setProfileCompletion(Math.min(profileCompletion + 10, 100))
-    }
-  }
-
-  const handleCertificateUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const newCert = {
-        id: certificates.length + 1,
-        name: e.target.files[0].name.replace(/\.[^/.]+$/, ""),
-        type: "Other",
-        date: new Date().toISOString().split("T")[0],
+      const file = e.target.files[0]
+      setUploadedCV(file)
+      
+      // For now, we'll save a placeholder URL. In production, you'd upload to a file storage service
+      // and get the actual URL
+      const fileUrl = `/uploads/cv/${file.name}`
+      
+      setSavingCV(true)
+      try {
+        const res = await fetch("/api/dashboard/student/cv", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ file_url: fileUrl }),
+        })
+        const result = await res.json()
+        if (res.ok && result.success) {
+          toast({
+            title: "Success",
+            description: "CV uploaded successfully",
+          })
+          await loadCV()
+          setProfileCompletion(Math.min(profileCompletion + 10, 100))
+        } else {
+          toast({
+            title: "Error",
+            description: result.message || "Failed to upload CV",
+            variant: "destructive",
+          })
+        }
+      } catch (error) {
+        console.error("Error uploading CV:", error)
+        toast({
+          title: "Error",
+          description: "Failed to upload CV",
+          variant: "destructive",
+        })
+      } finally {
+        setSavingCV(false)
       }
-      setCertificates([...certificates, newCert])
-      setProfileCompletion(Math.min(profileCompletion + 5, 100))
     }
   }
 
-  const removeCertificate = (id: number) => {
-    setCertificates(certificates.filter((cert) => cert.id !== id))
-    setProfileCompletion(Math.max(profileCompletion - 5, 0))
+  const handleCertificateUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0]
+      const fileName = file.name.replace(/\.[^/.]+$/, "")
+      const fileUrl = `/uploads/certificates/${file.name}`
+      
+      setSavingCertificates(true)
+      try {
+        const res = await fetch("/api/dashboard/student/certificates", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ file_url: fileUrl, name: fileName }),
+        })
+        const result = await res.json()
+        if (res.ok && result.success) {
+          toast({
+            title: "Success",
+            description: "Certificate uploaded successfully",
+          })
+          await loadCertificates()
+          setProfileCompletion(Math.min(profileCompletion + 5, 100))
+        } else {
+          toast({
+            title: "Error",
+            description: result.message || "Failed to upload certificate",
+            variant: "destructive",
+          })
+        }
+      } catch (error) {
+        console.error("Error uploading certificate:", error)
+        toast({
+          title: "Error",
+          description: "Failed to upload certificate",
+          variant: "destructive",
+        })
+      } finally {
+        setSavingCertificates(false)
+      }
+    }
+  }
+
+  const removeCertificate = async (id: string) => {
+    try {
+      const res = await fetch(`/api/dashboard/student/certificates?id=${id}`, {
+        method: "DELETE",
+      })
+      const result = await res.json()
+      if (res.ok && result.success) {
+        toast({
+          title: "Success",
+          description: "Certificate removed successfully",
+        })
+        await loadCertificates()
+        setProfileCompletion(Math.max(profileCompletion - 5, 0))
+      } else {
+        toast({
+          title: "Error",
+          description: result.message || "Failed to remove certificate",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("Error removing certificate:", error)
+      toast({
+        title: "Error",
+        description: "Failed to remove certificate",
+        variant: "destructive",
+      })
+    }
   }
 
   const addSkill = () => {
@@ -159,6 +299,39 @@ export default function StudentProfilePage() {
   const removeSkill = (skill: string) => {
     setSkills(skills.filter((s) => s !== skill))
     setProfileCompletion(Math.max(profileCompletion - 2, 0))
+  }
+
+  const handleSaveSkills = async () => {
+    setSavingSkills(true)
+    try {
+      const res = await fetch("/api/dashboard/student/skills", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ skills }),
+      })
+      const result = await res.json()
+      if (res.ok && result.success) {
+        toast({
+          title: "Success",
+          description: "Skills saved successfully",
+        })
+      } else {
+        toast({
+          title: "Error",
+          description: result.message || "Failed to save skills",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("Error saving skills:", error)
+      toast({
+        title: "Error",
+        description: "Failed to save skills",
+        variant: "destructive",
+      })
+    } finally {
+      setSavingSkills(false)
+    }
   }
 
   if (loading) {
@@ -359,15 +532,16 @@ export default function StudentProfilePage() {
                   <CardDescription>Upload your CV or resume to share with faculty members</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                  {uploadedCV ? (
+                  {(uploadedCV || cvData) ? (
                     <div className="border rounded-lg p-4 flex items-center justify-between">
                       <div className="flex items-center gap-3">
                         <FileText className="h-8 w-8 text-primary" />
                         <div>
-                          <p className="font-medium">{uploadedCV.name}</p>
+                          <p className="font-medium">{uploadedCV?.name || cvData?.file_url?.split('/').pop() || "CV"}</p>
                           <p className="text-sm text-muted-foreground">
-                            {(uploadedCV.size / 1024 / 1024).toFixed(2)} MB • Uploaded on{" "}
-                            {new Date().toLocaleDateString()}
+                            {uploadedCV ? `${(uploadedCV.size / 1024 / 1024).toFixed(2)} MB • ` : ""}
+                            Uploaded on{" "}
+                            {cvData?.uploaded_at ? new Date(cvData.uploaded_at).toLocaleDateString() : new Date().toLocaleDateString()}
                           </p>
                         </div>
                       </div>
@@ -379,7 +553,11 @@ export default function StudentProfilePage() {
                           variant="outline"
                           size="sm"
                           className="text-red-500 hover:text-red-700"
-                          onClick={() => setUploadedCV(null)}
+                          onClick={async () => {
+                            setUploadedCV(null)
+                            setCvData(null)
+                            // Optionally delete from database
+                          }}
                         >
                           Remove
                         </Button>
@@ -417,7 +595,17 @@ export default function StudentProfilePage() {
                   </div>
                 </CardContent>
                 <CardFooter className="flex justify-end">
-                  <Button className="bg-primary hover:bg-primary/90">Save Changes</Button>
+                  <Button 
+                    className="bg-primary hover:bg-primary/90" 
+                    disabled={savingCV}
+                    onClick={async () => {
+                      if (uploadedCV) {
+                        await handleCVUpload({ target: { files: [uploadedCV] } } as any)
+                      }
+                    }}
+                  >
+                    {savingCV ? "Saving..." : "Save Changes"}
+                  </Button>
                 </CardFooter>
               </Card>
             </TabsContent>
@@ -437,10 +625,7 @@ export default function StudentProfilePage() {
                           <div>
                             <p className="font-medium">{cert.name}</p>
                             <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                              <Badge variant="outline" className="text-xs">
-                                {cert.type}
-                              </Badge>
-                              <span>• {new Date(cert.date).toLocaleDateString()}</span>
+                              <span>• {cert.uploaded_at ? new Date(cert.uploaded_at).toLocaleDateString() : "Recently uploaded"}</span>
                             </div>
                           </div>
                         </div>
@@ -453,6 +638,7 @@ export default function StudentProfilePage() {
                             size="sm"
                             className="text-red-500 hover:text-red-700"
                             onClick={() => removeCertificate(cert.id)}
+                            disabled={savingCertificates}
                           >
                             <X className="h-4 w-4" />
                           </Button>
@@ -480,7 +666,12 @@ export default function StudentProfilePage() {
                   </div>
                 </CardContent>
                 <CardFooter className="flex justify-end">
-                  <Button className="bg-primary hover:bg-primary/90">Save Changes</Button>
+                  <Button 
+                    className="bg-primary hover:bg-primary/90"
+                    disabled={savingCertificates}
+                  >
+                    {savingCertificates ? "Saving..." : "Changes Saved Automatically"}
+                  </Button>
                 </CardFooter>
               </Card>
             </TabsContent>
@@ -538,7 +729,13 @@ export default function StudentProfilePage() {
                   </div>
                 </CardContent>
                 <CardFooter className="flex justify-end">
-                  <Button className="bg-primary hover:bg-primary/90">Save Changes</Button>
+                  <Button 
+                    className="bg-primary hover:bg-primary/90"
+                    onClick={handleSaveSkills}
+                    disabled={savingSkills}
+                  >
+                    {savingSkills ? "Saving..." : "Save Changes"}
+                  </Button>
                 </CardFooter>
               </Card>
             </TabsContent>
