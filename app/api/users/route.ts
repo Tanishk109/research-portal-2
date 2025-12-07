@@ -6,6 +6,9 @@ import { cache } from '@/lib/cache'
 import { hashPassword, toPlainObject } from "@/lib/db"
 import { FacultyProfile, StudentProfile } from "@/lib/models"
 
+// Force dynamic rendering for this route (uses request.url)
+export const dynamic = 'force-dynamic'
+
 // GET /api/users - Get all users
 export async function GET(request: NextRequest) {
   try {

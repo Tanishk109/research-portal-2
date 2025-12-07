@@ -4,6 +4,9 @@ import { User, FacultyProfile, StudentProfile } from "@/lib/models"
 import { createApiResponse, handleApiError, getUserIdFromRequest, getUserRoleFromRequest } from "@/lib/api-utils"
 import { toObjectId, toPlainObject } from "@/lib/db"
 
+// Force dynamic rendering for this route (uses cookies)
+export const dynamic = 'force-dynamic'
+
 // GET /api/auth/me - Get current user info
 export async function GET(request: NextRequest) {
   try {

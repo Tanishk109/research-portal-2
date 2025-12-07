@@ -4,6 +4,9 @@ import { StudentSkill } from "@/lib/models"
 import { getCurrentUser } from "@/app/actions/auth"
 import { toObjectId } from "@/lib/db"
 
+// Force dynamic rendering for this route (uses cookies)
+export const dynamic = 'force-dynamic'
+
 // GET /api/dashboard/student/skills - Get skills for current user
 export async function GET() {
   try {

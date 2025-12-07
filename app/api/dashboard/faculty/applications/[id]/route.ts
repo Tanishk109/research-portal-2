@@ -3,6 +3,10 @@ import { updateApplicationStatus } from "@/app/actions/applications";
 import { connectToMongoDB } from "@/lib/mongodb";
 import { Application, Project, FacultyProfile, StudentProfile, User } from "@/lib/models";
 import { toObjectId, toPlainObject } from "@/lib/db";
+import { getCurrentUser } from "@/app/actions/auth";
+
+// Force dynamic rendering for this route (uses cookies)
+export const dynamic = 'force-dynamic'
 
 export async function GET(
   request: Request,
@@ -19,7 +23,6 @@ export async function GET(
     }
 
     // Get current user to verify faculty access
-    const { getCurrentUser } = await import("@/app/actions/auth");
     const userResult = await getCurrentUser();
     
     if (!userResult.success || userResult.user?.role !== "faculty") {

@@ -4,6 +4,9 @@ import { getFacultyApplications } from "@/app/actions/applications";
 import { getRecentLoginActivity } from "@/app/actions/activity";
 import { getCurrentUser } from "@/app/actions/auth";
 
+// Force dynamic rendering for this route (uses cookies)
+export const dynamic = 'force-dynamic'
+
 export async function GET(request: Request) {
   try {
     // Verify user is authenticated and is faculty

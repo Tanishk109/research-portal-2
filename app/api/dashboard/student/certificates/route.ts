@@ -4,6 +4,9 @@ import { StudentCertificate } from "@/lib/models"
 import { getCurrentUser } from "@/app/actions/auth"
 import { toObjectId, toPlainObject } from "@/lib/db"
 
+// Force dynamic rendering for this route (uses cookies)
+export const dynamic = 'force-dynamic'
+
 // GET /api/dashboard/student/certificates - Get certificates for current user
 export async function GET() {
   try {

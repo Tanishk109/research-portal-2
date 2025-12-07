@@ -5,6 +5,9 @@ import { FacultyProfile } from "@/lib/models";
 import { updateFacultyProfile } from "@/app/actions/profiles";
 import { toObjectId, toPlainObject } from "@/lib/db";
 
+// Force dynamic rendering for this route (uses cookies)
+export const dynamic = 'force-dynamic'
+
 export async function GET() {
   try {
     await connectToMongoDB();

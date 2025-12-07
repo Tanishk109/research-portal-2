@@ -5,6 +5,9 @@ import { createApiResponse, handleApiError } from "@/lib/api-utils"
 import { cache } from '@/lib/cache'
 import { toObjectId, toPlainObject } from "@/lib/db"
 
+// Force dynamic rendering for this route (uses request.url)
+export const dynamic = 'force-dynamic'
+
 // GET /api/users/[id]/login-activity - Get login activity for a specific user
 export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
   try {

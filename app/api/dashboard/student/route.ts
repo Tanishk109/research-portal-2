@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { getStudentApplications } from "@/app/actions/applications";
 import { getCurrentUser } from "@/app/actions/auth";
 
+// Force dynamic rendering for this route (uses cookies)
+export const dynamic = 'force-dynamic'
+
 export async function GET(request: Request) {
   try {
     // Verify user is authenticated and is student

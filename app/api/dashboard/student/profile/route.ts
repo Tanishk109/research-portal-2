@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { getCurrentUserProfile, updateStudentProfile } from "@/app/actions/profiles";
 
+// Force dynamic rendering for this route (uses cookies)
+export const dynamic = 'force-dynamic'
+
 export async function GET() {
   const result = await getCurrentUserProfile();
 

@@ -8,6 +8,9 @@ import { nanoid } from "nanoid"
 import { JWT_SECRET, JWT_EXPIRATION, COOKIE_SETTINGS } from "@/lib/env"
 import { cookies } from "next/headers"
 
+// Force dynamic rendering for this route (uses cookies)
+export const dynamic = 'force-dynamic'
+
 // POST /api/auth/login - Login user
 export async function POST(request: NextRequest) {
   try {
