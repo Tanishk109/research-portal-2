@@ -181,7 +181,7 @@ export async function register(formData: FormData) {
     })
 
     // Create role-specific profile
-      if (role === "faculty") {
+    if (role === "faculty") {
       await FacultyProfile.create({
         user_id: user._id,
         faculty_id: facultyId,
@@ -190,7 +190,7 @@ export async function register(formData: FormData) {
         date_of_joining: new Date(dateOfJoining),
         date_of_birth: new Date(dateOfBirth),
       })
-      } else if (role === "student") {
+    } else if (role === "student") {
       await StudentProfile.create({
         user_id: user._id,
         registration_number: registrationNumber,
@@ -198,12 +198,12 @@ export async function register(formData: FormData) {
         year,
         cgpa: Number.parseFloat(cgpa),
       })
-      }
+    }
 
-      // Get user agent details
-      const { deviceType } = getUserAgentDetails(userAgent)
+    // Get user agent details
+    const { deviceType } = getUserAgentDetails(userAgent)
 
-      // Record successful registration as a login
+    // Record successful registration as a login
     await LoginActivity.create({
       user_id: user._id,
       timestamp: new Date(),
