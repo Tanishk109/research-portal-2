@@ -121,15 +121,5 @@ Tanishk Mittal
 B.Tech CSE (IoT & Intelligent Systems)  
 Full-stack developer interested in scalable systems, secure backend design, and building real-world solutions.
 
-## ⭐ Why This Repository Stands Out
-
-- Solves a real academic problem with a practical solution
-- Clean, secure, production-ready setup
-- Strong documentation and repository hygiene
-- Designed with scalability and maintainability in mind
-
-### 📌 Recommendation
-
-This repository is intended to be used as a **primary portfolio** project and is suitable for showcasing in resumes and technical interviews.
 
 
