@@ -79,28 +79,7 @@ research-portal-2/
 ├── tsconfig.json
 └── README.md
 
----
 
-## ⚙️ Getting Started
-
-### 1️⃣ Clone the repository
-```bash
-git clone https://github.com/Tanishk109/research-portal-2.git
-cd research-portal-2
-
-### 2️⃣ Install dependencies
-npm install
-
-### 3️⃣ Configure environment variables
-Create a .env.local file using the template:
-cp .env.example .env.local
-Fill in the required values.
-
-### 4️⃣ Run the development server
-npm run dev
-
-The application will be available at:
-http://localhost:3000
 
 
 ## 🔐 Security & Best Practices
