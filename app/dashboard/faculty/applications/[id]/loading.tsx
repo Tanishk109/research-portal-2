@@ -3,9 +3,9 @@ import FacultyDashboardHeader from "@/components/faculty-dashboard-header"
 
 export default function ApplicationDetailsLoading() {
   return (
-    <div className="flex min-h-screen flex-col bg-gray-50">
+    <div className="flex min-h-screen flex-col dashboard-shell">
       <FacultyDashboardHeader />
-      <main className="flex-1 p-6 md:p-10">
+      <main className="flex-1 px-4 py-8 md:px-6">
         <div className="mb-6">
           <Skeleton className="h-6 w-32" />
         </div>

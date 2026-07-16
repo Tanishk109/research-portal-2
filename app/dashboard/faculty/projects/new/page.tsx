@@ -81,19 +81,20 @@ export default function NewProjectPage() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className="flex min-h-screen flex-col faculty-shell">
       <FacultyDashboardHeader />
-      <main className="flex-1 p-6 md:p-10">
-        <div className="max-w-3xl mx-auto">
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold tracking-tight">Create New Research Project</h1>
-            <p className="text-muted-foreground mt-2">
-              Provide details about your research project to attract qualified students
+      <main className="flex-1 px-4 py-8 md:px-6">
+        <div className="container mx-auto max-w-4xl">
+          <section className="faculty-hero mb-6 rounded-lg p-6 text-white md:p-8">
+            <p className="text-sm font-medium uppercase tracking-[0.24em] text-cyan-100">Project Builder</p>
+            <h1 className="mt-3 text-3xl font-semibold tracking-tight md:text-5xl">Create Research Project</h1>
+            <p className="mt-4 max-w-2xl text-sm leading-6 text-slate-100 md:text-base">
+              Define the opportunity, requirements, and application window students will see.
             </p>
-          </div>
+          </section>
 
           <form onSubmit={handleSubmit}>
-            <Card>
+            <Card className="faculty-panel-strong rounded-lg">
               <CardHeader>
                 <CardTitle>Project Details</CardTitle>
                 <CardDescription>Basic information about your research project</CardDescription>
@@ -101,7 +102,7 @@ export default function NewProjectPage() {
               <CardContent className="space-y-6">
                 <div className="space-y-2">
                   <Label htmlFor="title">Project Title</Label>
-                  <Input id="title" name="title" placeholder="e.g. Machine Learning for Healthcare" required />
+                  <Input id="title" name="title" placeholder="e.g. Machine Learning for Healthcare" className="bg-white/80" required />
                 </div>
 
                 <div className="space-y-2">
@@ -110,7 +111,7 @@ export default function NewProjectPage() {
                     id="description"
                     name="description"
                     placeholder="Describe your research project, its goals, and what students will be working on..."
-                    className="min-h-[150px]"
+                    className="min-h-[150px] bg-white/80"
                     required
                   />
                 </div>
@@ -119,7 +120,7 @@ export default function NewProjectPage() {
                   <div className="space-y-2">
                     <Label htmlFor="research-area">Research Area</Label>
                     <Select name="research-area" required>
-                      <SelectTrigger id="research-area">
+                      <SelectTrigger id="research-area" className="bg-white/80">
                         <SelectValue placeholder="Select area" />
                       </SelectTrigger>
                       <SelectContent>
@@ -137,7 +138,7 @@ export default function NewProjectPage() {
 
                   <div className="space-y-2">
                     <Label htmlFor="positions">Number of Positions</Label>
-                    <Input id="positions" name="positions" type="number" min="1" max="10" defaultValue="2" required />
+                    <Input id="positions" name="positions" type="number" min="1" max="10" defaultValue="2" className="bg-white/80" required />
                   </div>
                 </div>
 
@@ -150,7 +151,7 @@ export default function NewProjectPage() {
                         <button
                           type="button"
                           onClick={() => handleRemoveTag(tag)}
-                          className="ml-1 rounded-full hover:bg-muted p-1"
+                          className="ml-1 rounded-full p-1 hover:bg-muted"
                         >
                           <X className="h-3 w-3" />
                           <span className="sr-only">Remove {tag}</span>
@@ -161,6 +162,7 @@ export default function NewProjectPage() {
                   <Input
                     id="tags"
                     placeholder="e.g. Python, Machine Learning, Data Analysis"
+                    className="bg-white/80"
                     value={tagInput}
                     onChange={(e) => setTagInput(e.target.value)}
                     onKeyDown={handleAddTag}
@@ -170,23 +172,23 @@ export default function NewProjectPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
                     <Label htmlFor="start-date">Start Date</Label>
-                    <Input id="start-date" name="start-date" type="date" required />
+                    <Input id="start-date" name="start-date" type="date" className="bg-white/80" required />
                   </div>
 
                   <div className="space-y-2">
                     <Label htmlFor="deadline">Application Deadline</Label>
-                    <Input id="deadline" name="deadline" type="date" required />
+                    <Input id="deadline" name="deadline" type="date" className="bg-white/80" required />
                   </div>
                 </div>
               </CardContent>
-              <CardHeader className="border-t">
+              <CardHeader className="border-t border-slate-200/80">
                 <CardTitle>Requirements</CardTitle>
                 <CardDescription>Specify what you're looking for in student applicants</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="space-y-2">
                   <Label htmlFor="min-cgpa">Minimum CGPA</Label>
-                  <Input id="min-cgpa" name="min-cgpa" type="number" step="0.1" min="0" max="10" placeholder="e.g. 8.0" />
+                  <Input id="min-cgpa" name="min-cgpa" type="number" step="0.1" min="0" max="10" placeholder="e.g. 8.0" className="bg-white/80" />
                 </div>
 
                 <div className="space-y-2">
@@ -195,7 +197,7 @@ export default function NewProjectPage() {
                     id="eligibility"
                     name="eligibility"
                     placeholder="Describe the eligibility criteria for students (e.g. year of study, specific courses, etc.)"
-                    className="min-h-[100px]"
+                    className="min-h-[100px] bg-white/80"
                   />
                 </div>
 
@@ -205,15 +207,15 @@ export default function NewProjectPage() {
                     id="prerequisites"
                     name="prerequisites"
                     placeholder="List any prerequisites or required skills for this project"
-                    className="min-h-[100px]"
+                    className="min-h-[100px] bg-white/80"
                   />
                 </div>
               </CardContent>
-              <CardFooter className="flex justify-between border-t pt-6">
+              <CardFooter className="flex flex-col gap-3 border-t border-slate-200/80 pt-6 sm:flex-row sm:justify-between">
                 <Button type="button" variant="outline" onClick={() => router.back()}>
                   Cancel
                 </Button>
-                <div className="flex gap-2">
+                <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
                   <Button type="submit" name="status" value="draft" variant="outline" disabled={isLoading}>
                     Save as Draft
                   </Button>

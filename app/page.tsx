@@ -2,12 +2,13 @@ import Link from "next/link"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { ArrowRight, BookOpen, GraduationCap, Users } from "lucide-react"
 import { AnimatedBackground } from "@/components/animated-background"
 import { GradientBackground } from "@/components/gradient-background"
 import { AnimatedShapes } from "@/components/animated-shapes"
 import { connectToMongoDB } from "@/lib/mongodb"
-import { User, FacultyProfile } from "@/lib/models"
+import { User } from "@/lib/models"
 import { toPlainObject } from "@/lib/db"
 
 export const dynamic = "force-dynamic"
@@ -33,6 +34,7 @@ export default async function Home() {
           first_name: 1,
           last_name: 1,
           email: 1,
+          profile_picture_url: 1,
           department: "$profile.department",
           specialization: "$profile.specialization",
         },
@@ -319,7 +321,12 @@ export default async function Home() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-6">
             {faculty.map((f: any, i: number) => (
               <div key={i} className="bg-white rounded-lg shadow p-6 flex flex-col items-center">
-                <Image src="/placeholder-user.jpg" alt="Faculty photo" width={80} height={80} className="rounded-full mb-4" />
+                <Avatar className="mb-4 h-20 w-20 border-2 border-primary-200">
+                  <AvatarImage src={f.profile_picture_url || ""} alt={`${f.first_name} ${f.last_name}`} />
+                  <AvatarFallback>
+                    {`${f.first_name?.charAt(0) || ""}${f.last_name?.charAt(0) || ""}`}
+                  </AvatarFallback>
+                </Avatar>
                 <h3 className="text-lg font-semibold mb-1">{f.first_name} {f.last_name}</h3>
                 <div className="text-sm text-gray-600 mb-1">{f.specialization}</div>
                 <div className="text-sm text-gray-500 mb-1">{f.department}</div>

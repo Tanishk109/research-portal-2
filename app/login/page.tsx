@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { useState, useEffect } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useSearchParams } from "next/navigation"
 import Link from "next/link"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
@@ -11,19 +11,19 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Eye, EyeOff, AlertCircle, Database, Info } from "lucide-react"
+import { Eye, EyeOff } from "lucide-react"
 import { toast } from "@/components/ui/use-toast"
 import { AuthBackground } from "@/components/auth-background"
 import { api, endpoints, getClientIpAddress } from "@/lib/api-client"
 
 export default function LoginPage() {
-  const router = useRouter()
   const searchParams = useSearchParams()
   const defaultRole = searchParams?.get("role") || "faculty"
+  const authError = searchParams?.get("error") || ""
+  const redirectTo = searchParams?.get("redirect") || ""
   const [isLoading, setIsLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [activeTab, setActiveTab] = useState(defaultRole)
-  const [dbStatus, setDbStatus] = useState<"checking" | "connected" | "disconnected" | "preview">("checking")
   const [ipAddress, setIpAddress] = useState<string>("unknown")
 
   const [formData, setFormData] = useState({
@@ -42,36 +42,23 @@ export default function LoginPage() {
     setActiveTab(defaultRole)
   }, [defaultRole])
 
-  // Check database connection
   useEffect(() => {
-    const checkDbConnection = async () => {
-      try {
-        const response = await api.get(endpoints.health)
+    if (!authError) return
 
-        if (response.success && response.data) {
-          // Check if database is connected
-          if (response.data.status === "preview_no_db") {
-            setDbStatus("preview")
-          } else if (response.data.database?.connected === true || response.data.status === "healthy") {
-            setDbStatus("connected")
-          } else {
-            setDbStatus("disconnected")
-          }
-        } else {
-          // If health check fails, still allow login (database might be slow to connect)
-          // The actual login will handle the connection
-          console.warn("Health check returned unsuccessful, but allowing login attempt")
-          setDbStatus("connected") // Allow login to proceed
-        }
-      } catch (error) {
-        console.error("Health check error:", error)
-        // Don't block login if health check fails - let the actual login handle it
-        setDbStatus("connected") // Allow login to proceed
-      }
+    const messages: Record<string, string> = {
+      google_not_configured: "Google sign-in is not configured yet.",
+      google_state_invalid: "Google sign-in expired. Please try again.",
+      google_email_unverified: "Google could not verify that email address.",
+      google_auth_failed: "Google sign-in failed. Please try again.",
+      google_account_not_found: "No portal account exists for that Google email. Please register first.",
     }
 
-    checkDbConnection()
-  }, [])
+    toast({
+      title: "Google sign-in unavailable",
+      description: messages[authError] || "Google sign-in could not be completed.",
+      variant: "destructive",
+    })
+  }, [authError])
 
   // Get client IP address
   useEffect(() => {
@@ -106,21 +93,6 @@ export default function LoginPage() {
           variant: "destructive",
         })
         setIsLoading(false)
-        return
-      }
-
-      // In preview mode with no DB, simulate successful login
-      if (dbStatus === "preview") {
-        toast({
-          title: "Preview Mode Login",
-          description: "Simulating successful login in preview mode",
-        })
-
-        // Redirect based on role
-        setTimeout(() => {
-          router.push(`/dashboard/${role}`)
-        }, 1500)
-
         return
       }
 
@@ -171,6 +143,35 @@ export default function LoginPage() {
     }
   }
 
+  const handleGoogleSignIn = (role: "faculty" | "student") => {
+    const params = new URLSearchParams({ role })
+    if (redirectTo.startsWith("/") && !redirectTo.startsWith("//")) {
+      params.set("redirect", redirectTo)
+    }
+    window.location.href = `/api/auth/google/start?${params.toString()}`
+  }
+
+  const GoogleIcon = () => (
+    <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">
+      <path
+        fill="#4285F4"
+        d="M21.6 12.2c0-.7-.1-1.4-.2-2H12v3.8h5.4c-.2 1.2-.9 2.3-2 3v2.5h3.2c1.9-1.7 3-4.3 3-7.3z"
+      />
+      <path
+        fill="#34A853"
+        d="M12 22c2.7 0 5-.9 6.6-2.5L15.4 17c-.9.6-2 .9-3.4.9-2.6 0-4.8-1.8-5.6-4.1H3.1v2.6C4.7 19.7 8.1 22 12 22z"
+      />
+      <path
+        fill="#FBBC05"
+        d="M6.4 13.8c-.2-.6-.3-1.2-.3-1.8s.1-1.2.3-1.8V7.6H3.1C2.4 8.9 2 10.4 2 12s.4 3.1 1.1 4.4l3.3-2.6z"
+      />
+      <path
+        fill="#EA4335"
+        d="M12 6.1c1.5 0 2.8.5 3.8 1.5l2.8-2.8C16.9 3.1 14.7 2 12 2 8.1 2 4.7 4.3 3.1 7.6l3.3 2.6C7.2 7.9 9.4 6.1 12 6.1z"
+      />
+    </svg>
+  )
+
   return (
     <>
       <AuthBackground />
@@ -197,45 +198,7 @@ export default function LoginPage() {
                 Sign in to your account
               </h1>
               <p className="text-sm text-muted-foreground">Enter your credentials to access the portal</p>
-
-              {/* Database connection status */}
-              <div className="flex items-center justify-center mt-2">
-                <div
-                  className={`flex items-center gap-1.5 text-xs px-2 py-1 rounded-full ${
-                    dbStatus === "checking"
-                      ? "bg-yellow-100 text-yellow-800"
-                      : dbStatus === "connected"
-                        ? "bg-green-100 text-green-800"
-                        : dbStatus === "preview"
-                          ? "bg-blue-100 text-blue-800"
-                          : "bg-red-100 text-red-800"
-                  }`}
-                >
-                  <Database className="h-3 w-3" />
-                  <span>
-                    {dbStatus === "checking"
-                      ? "Checking database..."
-                      : dbStatus === "connected"
-                        ? "Database connected"
-                        : dbStatus === "preview"
-                          ? "Preview mode (no database)"
-                          : "Database disconnected"}
-                  </span>
-                </div>
-              </div>
             </div>
-
-            {dbStatus === "preview" && (
-              <div className="p-3 bg-blue-100 text-blue-800 rounded-md text-sm">
-                <div className="font-semibold flex items-center gap-1.5">
-                  <Info className="h-4 w-4" />
-                  Preview Mode
-                </div>
-                <p className="mt-1">
-                  Running in preview mode without a database connection. Login functionality is simulated.
-                </p>
-              </div>
-            )}
 
             <Tabs defaultValue={activeTab} onValueChange={setActiveTab} className="w-full">
               <TabsList className="grid w-full grid-cols-2">
@@ -292,7 +255,7 @@ export default function LoginPage() {
                       <Button
                         type="submit"
                         className="w-full bg-gradient-to-r from-secondary-500 to-primary-500 hover:from-secondary-600 hover:to-primary-600 text-white"
-                        disabled={isLoading || (dbStatus !== "connected" && dbStatus !== "preview")}
+                        disabled={isLoading}
                       >
                         {isLoading ? (
                           <div className="flex items-center gap-2">
@@ -305,6 +268,18 @@ export default function LoginPage() {
                       </Button>
                     </CardFooter>
                   </form>
+                  <CardFooter className="pt-0">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full gap-2 bg-white/70"
+                      onClick={() => handleGoogleSignIn("faculty")}
+                      disabled={isLoading}
+                    >
+                      <GoogleIcon />
+                      Continue with Google
+                    </Button>
+                  </CardFooter>
                 </Card>
               </TabsContent>
               <TabsContent value="student">
@@ -357,7 +332,7 @@ export default function LoginPage() {
                       <Button
                         type="submit"
                         className="w-full bg-gradient-to-r from-secondary-500 to-primary-500 hover:from-secondary-600 hover:to-primary-600 text-white"
-                        disabled={isLoading || (dbStatus !== "connected" && dbStatus !== "preview")}
+                        disabled={isLoading}
                       >
                         {isLoading ? (
                           <div className="flex items-center gap-2">
@@ -370,6 +345,18 @@ export default function LoginPage() {
                       </Button>
                     </CardFooter>
                   </form>
+                  <CardFooter className="pt-0">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full gap-2 bg-white/70"
+                      onClick={() => handleGoogleSignIn("student")}
+                      disabled={isLoading}
+                    >
+                      <GoogleIcon />
+                      Continue with Google
+                    </Button>
+                  </CardFooter>
                 </Card>
               </TabsContent>
             </Tabs>
@@ -383,21 +370,6 @@ export default function LoginPage() {
               </Link>
             </div>
 
-            {dbStatus === "disconnected" && (
-              <div className="p-3 bg-red-100 text-red-800 rounded-md text-sm">
-                <div className="font-semibold flex items-center gap-1.5">
-                  <AlertCircle className="h-4 w-4" />
-                  Database Connection Error
-                </div>
-                <p className="mt-1">
-                  Unable to connect to the database. Please check your database configuration or visit the{" "}
-                  <Link href="/admin/database-test" className="underline font-medium">
-                    database test page
-                  </Link>{" "}
-                  for troubleshooting.
-                </p>
-              </div>
-            )}
           </div>
         </div>
       </div>

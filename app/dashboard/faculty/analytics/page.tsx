@@ -39,18 +39,21 @@ export default function AnalyticsDashboard() {
   }, [toast])
 
   return (
-    <div className="flex min-h-screen flex-col bg-gray-50">
+    <div className="flex min-h-screen flex-col dashboard-shell">
       <FacultyDashboardHeader />
-      <main className="flex-1 p-6 md:p-10">
-        <div className="grid gap-6">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight text-primary">Analytics Dashboard</h1>
-            <p className="text-muted-foreground">Track metrics and performance of your research projects</p>
-          </div>
+      <main className="flex-1 px-4 py-8 md:px-6">
+        <div className="container mx-auto grid gap-6">
+          <section className="dashboard-hero rounded-lg p-6 text-white md:p-8">
+            <p className="text-sm font-medium uppercase tracking-[0.24em] text-cyan-100">Faculty Analytics</p>
+            <h1 className="mt-3 text-3xl font-semibold tracking-tight md:text-5xl">Analytics Dashboard</h1>
+            <p className="mt-4 max-w-2xl text-sm leading-6 text-slate-100 md:text-base">
+              Track metrics and performance of your research projects from the same faculty workspace.
+            </p>
+          </section>
 
           {/* Overview Cards */}
           <div className="grid gap-6 md:grid-cols-4">
-            <Card className="border-t-4 border-t-primary">
+            <Card className="dashboard-panel dashboard-lift rounded-lg">
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium">Total Projects</CardTitle>
               </CardHeader>
@@ -62,7 +65,7 @@ export default function AnalyticsDashboard() {
                 )}
               </CardContent>
             </Card>
-            <Card className="border-t-4 border-t-blue-500">
+            <Card className="dashboard-panel dashboard-lift rounded-lg">
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium">Total Applications</CardTitle>
               </CardHeader>
@@ -74,7 +77,7 @@ export default function AnalyticsDashboard() {
                 )}
               </CardContent>
             </Card>
-            <Card className="border-t-4 border-t-green-500">
+            <Card className="dashboard-panel dashboard-lift rounded-lg">
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium">Approved Applications</CardTitle>
               </CardHeader>
@@ -88,7 +91,7 @@ export default function AnalyticsDashboard() {
                 )}
               </CardContent>
             </Card>
-            <Card className="border-t-4 border-t-yellow-500">
+            <Card className="dashboard-panel dashboard-lift rounded-lg">
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium">Conversion Rate</CardTitle>
               </CardHeader>
@@ -103,17 +106,14 @@ export default function AnalyticsDashboard() {
           </div>
 
           <Tabs defaultValue="projects" className="space-y-4">
-            <TabsList className="bg-white border">
-              <TabsTrigger value="projects" className="data-[state=active]:bg-primary data-[state=active]:text-white">
+            <TabsList className="grid h-auto w-full grid-cols-1 gap-1 rounded-lg border border-slate-200 bg-white/90 p-1 shadow-sm md:grid-cols-3">
+              <TabsTrigger value="projects">
                 Project Analytics
               </TabsTrigger>
-              <TabsTrigger
-                value="applications"
-                className="data-[state=active]:bg-primary data-[state=active]:text-white"
-              >
+              <TabsTrigger value="applications">
                 Application Analytics
               </TabsTrigger>
-              <TabsTrigger value="students" className="data-[state=active]:bg-primary data-[state=active]:text-white">
+              <TabsTrigger value="students">
                 Student Demographics
               </TabsTrigger>
             </TabsList>
@@ -121,7 +121,7 @@ export default function AnalyticsDashboard() {
             {/* Project Analytics Tab */}
             <TabsContent value="projects" className="space-y-4">
               <div className="grid gap-4 md:grid-cols-2">
-                <Card>
+                <Card className="dashboard-panel rounded-lg">
                   <CardHeader>
                     <CardTitle>Projects by Status</CardTitle>
                     <CardDescription>Distribution of projects by their current status</CardDescription>
@@ -141,7 +141,7 @@ export default function AnalyticsDashboard() {
                     )}
                   </CardContent>
                 </Card>
-                <Card>
+                <Card className="dashboard-panel rounded-lg">
                   <CardHeader>
                     <CardTitle>Projects by Research Area</CardTitle>
                     <CardDescription>Distribution of projects across research areas</CardDescription>
@@ -162,7 +162,7 @@ export default function AnalyticsDashboard() {
                     )}
                   </CardContent>
                 </Card>
-                <Card className="md:col-span-2">
+                <Card className="dashboard-panel rounded-lg md:col-span-2">
                   <CardHeader>
                     <CardTitle>Projects Created Over Time</CardTitle>
                     <CardDescription>Number of projects created per month</CardDescription>
@@ -189,7 +189,7 @@ export default function AnalyticsDashboard() {
             {/* Application Analytics Tab */}
             <TabsContent value="applications" className="space-y-4">
               <div className="grid gap-4 md:grid-cols-2">
-                <Card>
+                <Card className="dashboard-panel rounded-lg">
                   <CardHeader>
                     <CardTitle>Applications by Status</CardTitle>
                     <CardDescription>Distribution of applications by their current status</CardDescription>
@@ -209,7 +209,7 @@ export default function AnalyticsDashboard() {
                     )}
                   </CardContent>
                 </Card>
-                <Card>
+                <Card className="dashboard-panel rounded-lg">
                   <CardHeader>
                     <CardTitle>Top Projects by Applications</CardTitle>
                     <CardDescription>Projects with the most applications</CardDescription>
@@ -230,7 +230,7 @@ export default function AnalyticsDashboard() {
                     )}
                   </CardContent>
                 </Card>
-                <Card className="md:col-span-2">
+                <Card className="dashboard-panel rounded-lg md:col-span-2">
                   <CardHeader>
                     <CardTitle>Applications Over Time</CardTitle>
                     <CardDescription>Number of applications received per month</CardDescription>
@@ -257,7 +257,7 @@ export default function AnalyticsDashboard() {
             {/* Student Demographics Tab */}
             <TabsContent value="students" className="space-y-4">
               <div className="grid gap-4 md:grid-cols-2">
-                <Card>
+                <Card className="dashboard-panel rounded-lg">
                   <CardHeader>
                     <CardTitle>Applicants by Department</CardTitle>
                     <CardDescription>Distribution of applicants across departments</CardDescription>
@@ -277,7 +277,7 @@ export default function AnalyticsDashboard() {
                     )}
                   </CardContent>
                 </Card>
-                <Card>
+                <Card className="dashboard-panel rounded-lg">
                   <CardHeader>
                     <CardTitle>Applicants by Year</CardTitle>
                     <CardDescription>Distribution of applicants by academic year</CardDescription>
@@ -297,7 +297,7 @@ export default function AnalyticsDashboard() {
                     )}
                   </CardContent>
                 </Card>
-                <Card>
+                <Card className="dashboard-panel rounded-lg">
                   <CardHeader>
                     <CardTitle>Applicants by CGPA Range</CardTitle>
                     <CardDescription>Distribution of applicants by CGPA range</CardDescription>

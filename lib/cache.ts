@@ -25,6 +25,14 @@ class SimpleCache {
       expires: Date.now() + ttlSeconds * 1000,
     })
   }
+
+  deleteByPrefix(prefix: string) {
+    for (const key of this.store.keys()) {
+      if (key.startsWith(prefix)) {
+        this.store.delete(key)
+      }
+    }
+  }
 }
 
 export const cache = new SimpleCache() 

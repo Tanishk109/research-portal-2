@@ -158,25 +158,34 @@ export default function EditProjectPage() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className="flex min-h-screen flex-col faculty-shell">
       <FacultyDashboardHeader />
-      <main className="flex-1 p-6 md:p-10">
-        <div className="mx-auto max-w-3xl">
+      <main className="flex-1 px-4 py-8 md:px-6">
+        <div className="container mx-auto max-w-4xl">
           <Link
             href="/dashboard/faculty/projects"
-            className="mb-6 inline-flex items-center text-sm text-muted-foreground hover:text-foreground"
+            className="mb-6 inline-flex items-center text-sm font-medium text-slate-600 hover:text-slate-950"
           >
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back to Projects
           </Link>
 
           {loading || !project ? (
-            <div className="flex items-center justify-center rounded-lg border py-16">
+            <div className="faculty-panel flex items-center justify-center rounded-lg py-16">
               <Loader2 className="h-6 w-6 animate-spin text-primary" />
             </div>
           ) : (
-            <form onSubmit={handleSubmit}>
-              <Card>
+            <>
+              <section className="faculty-hero mb-6 rounded-lg p-6 text-white md:p-8">
+                <p className="text-sm font-medium uppercase tracking-[0.24em] text-cyan-100">Project Editor</p>
+                <h1 className="mt-3 text-3xl font-semibold tracking-tight md:text-5xl">Edit Research Project</h1>
+                <p className="mt-4 max-w-2xl text-sm leading-6 text-slate-100 md:text-base">
+                  Update the project details students see before applying.
+                </p>
+              </section>
+
+              <form onSubmit={handleSubmit}>
+              <Card className="faculty-panel-strong rounded-lg">
                 <CardHeader>
                   <CardTitle>Edit Research Project</CardTitle>
                   <CardDescription>Update the project details students see before applying.</CardDescription>
@@ -184,7 +193,7 @@ export default function EditProjectPage() {
                 <CardContent className="space-y-6">
                   <div className="space-y-2">
                     <Label htmlFor="title">Project Title</Label>
-                    <Input id="title" name="title" defaultValue={project.title} required />
+                    <Input id="title" name="title" defaultValue={project.title} className="bg-white/80" required />
                   </div>
 
                   <div className="space-y-2">
@@ -193,7 +202,7 @@ export default function EditProjectPage() {
                       id="description"
                       name="description"
                       defaultValue={project.long_description || project.description}
-                      className="min-h-[150px]"
+                      className="min-h-[150px] bg-white/80"
                       required
                     />
                   </div>
@@ -202,7 +211,7 @@ export default function EditProjectPage() {
                     <div className="space-y-2">
                       <Label htmlFor="research-area">Research Area</Label>
                       <Select name="research-area" defaultValue={project.research_area || "ai"} required>
-                        <SelectTrigger id="research-area">
+                        <SelectTrigger id="research-area" className="bg-white/80">
                           <SelectValue placeholder="Select area" />
                         </SelectTrigger>
                         <SelectContent>
@@ -221,7 +230,7 @@ export default function EditProjectPage() {
                     <div className="space-y-2">
                       <Label htmlFor="status">Status</Label>
                       <Select name="status" defaultValue={project.status || "active"} required>
-                        <SelectTrigger id="status">
+                        <SelectTrigger id="status" className="bg-white/80">
                           <SelectValue placeholder="Select status" />
                         </SelectTrigger>
                         <SelectContent>
@@ -237,7 +246,7 @@ export default function EditProjectPage() {
                   <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                     <div className="space-y-2">
                       <Label htmlFor="positions">Number of Positions</Label>
-                      <Input id="positions" name="positions" type="number" min="1" max="10" defaultValue={project.positions || 1} required />
+                      <Input id="positions" name="positions" type="number" min="1" max="10" defaultValue={project.positions || 1} className="bg-white/80" required />
                     </div>
 
                     <div className="space-y-2">
@@ -250,6 +259,7 @@ export default function EditProjectPage() {
                         min="0"
                         max="10"
                         defaultValue={project.min_cgpa || ""}
+                        className="bg-white/80"
                       />
                     </div>
                   </div>
@@ -274,6 +284,7 @@ export default function EditProjectPage() {
                     <Input
                       id="tags"
                       placeholder="Press Enter to add a tag"
+                      className="bg-white/80"
                       value={tagInput}
                       onChange={(event) => setTagInput(event.target.value)}
                       onKeyDown={handleAddTag}
@@ -283,26 +294,26 @@ export default function EditProjectPage() {
                   <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                     <div className="space-y-2">
                       <Label htmlFor="start-date">Start Date</Label>
-                      <Input id="start-date" name="start-date" type="date" defaultValue={formatDateInput(project.start_date)} required />
+                      <Input id="start-date" name="start-date" type="date" defaultValue={formatDateInput(project.start_date)} className="bg-white/80" required />
                     </div>
 
                     <div className="space-y-2">
                       <Label htmlFor="deadline">Application Deadline</Label>
-                      <Input id="deadline" name="deadline" type="date" defaultValue={formatDateInput(project.deadline)} required />
+                      <Input id="deadline" name="deadline" type="date" defaultValue={formatDateInput(project.deadline)} className="bg-white/80" required />
                     </div>
                   </div>
 
                   <div className="space-y-2">
                     <Label htmlFor="eligibility">Eligibility Criteria</Label>
-                    <Textarea id="eligibility" name="eligibility" defaultValue={project.eligibility || ""} className="min-h-[100px]" />
+                    <Textarea id="eligibility" name="eligibility" defaultValue={project.eligibility || ""} className="min-h-[100px] bg-white/80" />
                   </div>
 
                   <div className="space-y-2">
                     <Label htmlFor="prerequisites">Prerequisites</Label>
-                    <Textarea id="prerequisites" name="prerequisites" defaultValue={project.prerequisites || ""} className="min-h-[100px]" />
+                    <Textarea id="prerequisites" name="prerequisites" defaultValue={project.prerequisites || ""} className="min-h-[100px] bg-white/80" />
                   </div>
                 </CardContent>
-                <CardFooter className="flex justify-between border-t pt-6">
+                <CardFooter className="flex flex-col gap-3 border-t border-slate-200/80 pt-6 sm:flex-row sm:justify-between">
                   <Button type="button" variant="outline" onClick={() => router.back()} disabled={saving}>
                     Cancel
                   </Button>
@@ -318,7 +329,8 @@ export default function EditProjectPage() {
                   </Button>
                 </CardFooter>
               </Card>
-            </form>
+              </form>
+            </>
           )}
         </div>
       </main>

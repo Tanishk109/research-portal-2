@@ -1,7 +1,7 @@
 "use server"
 
 import { connectToMongoDB } from "@/lib/mongodb"
-import { Project, User, FacultyProfile, Application } from "@/lib/models"
+import { Project, FacultyProfile, Application } from "@/lib/models"
 import { getCurrentUser } from "./auth"
 import { revalidatePath } from "next/cache"
 import { cache } from "@/lib/cache"
@@ -37,8 +37,31 @@ export type ProjectWithFaculty = {
   prerequisites: string
   created_at: string
   faculty_name: string
+  faculty_avatar?: string | null
   department: string
   tags: string[]
+}
+
+function serializeProjectRow<T extends Record<string, any>>(project: T) {
+  const plain = toPlainObject(project)
+
+  return {
+    ...plain,
+    id: String(plain.id || plain._id || ""),
+    start_date: plain.start_date ? String(plain.start_date) : "",
+    deadline: plain.deadline ? String(plain.deadline) : "",
+    created_at: plain.created_at ? String(plain.created_at) : "",
+    updated_at: plain.updated_at ? String(plain.updated_at) : undefined,
+    tags: Array.isArray(plain.tags)
+      ? plain.tags.map((tag: unknown) => String(tag))
+      : typeof plain.tags === "string"
+        ? plain.tags.split(",").map((tag: string) => tag.trim()).filter(Boolean)
+        : [],
+  }
+}
+
+function serializeProjectRows<T extends Record<string, any>>(projects: T[]) {
+  return projects.map(serializeProjectRow)
 }
 
 // Get all projects
@@ -105,6 +128,7 @@ export async function getProjects(
           prerequisites: 1,
           created_at: 1,
           faculty_name: { $concat: ["$facultyUser.first_name", " ", "$facultyUser.last_name"] },
+          faculty_avatar: { $ifNull: ["$facultyUser.profile_picture_url", null] },
           department: "$facultyProfile.department",
           tags: { $ifNull: ["$tags", []] },
         },
@@ -112,7 +136,7 @@ export async function getProjects(
       { $sort: { created_at: -1 } },
     ])
 
-    return projects as ProjectWithFaculty[]
+    return serializeProjectRows(projects) as ProjectWithFaculty[]
   } catch (error) {
     console.error("Get all projects error:", error)
     throw error
@@ -167,6 +191,7 @@ export async function getActiveProjects() {
           prerequisites: 1,
           created_at: 1,
           faculty_name: { $concat: ["$facultyUser.first_name", " ", "$facultyUser.last_name"] },
+          faculty_avatar: { $ifNull: ["$facultyUser.profile_picture_url", null] },
           department: "$facultyProfile.department",
           tags: { $ifNull: ["$tags", []] },
         },
@@ -174,7 +199,7 @@ export async function getActiveProjects() {
       { $sort: { created_at: -1 } },
     ])
 
-    return projects as ProjectWithFaculty[]
+    return serializeProjectRows(projects) as ProjectWithFaculty[]
   } catch (error) {
     console.error("Get active projects error:", error)
     throw error
@@ -228,6 +253,7 @@ export async function getProjectById(id: number | string) {
           created_at: 1,
           faculty_id: { $toString: "$facultyProfile._id" },
           faculty_name: { $concat: ["$facultyUser.first_name", " ", "$facultyUser.last_name"] },
+          faculty_avatar: { $ifNull: ["$facultyUser.profile_picture_url", null] },
           department: "$facultyProfile.department",
           specialization: "$facultyProfile.specialization",
           faculty_email: "$facultyUser.email",
@@ -241,7 +267,7 @@ export async function getProjectById(id: number | string) {
       return null
     }
 
-    return projects[0]
+    return serializeProjectRow(projects[0])
   } catch (error) {
     console.error("Get project by ID error:", error)
     throw error
@@ -267,7 +293,7 @@ export async function getFacultyProjects() {
     // Use cache per faculty user
     const cacheKey = `faculty-projects-${user.id}`
     const cached = cache.get<any[]>(cacheKey)
-    if (cached) return cached
+    if (cached) return serializeProjectRows(cached)
 
     const userId = toObjectId(user.id)
     if (!userId) {
@@ -310,8 +336,9 @@ export async function getFacultyProjects() {
       { $sort: { created_at: -1 } },
     ])
 
-    cache.set(cacheKey, projects, 30) // cache for 30 seconds
-    return projects
+    const serializedProjects = serializeProjectRows(projects)
+    cache.set(cacheKey, serializedProjects, 30) // cache for 30 seconds
+    return serializedProjects
   } catch (error) {
     console.error("Get faculty projects error:", error)
     throw error

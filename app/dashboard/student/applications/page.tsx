@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Input } from "@/components/ui/input"
 import { Search, Calendar } from "lucide-react"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { getStudentApplications } from "@/app/actions/applications"
 import StudentDashboardHeader from "@/components/student-dashboard-header"
 import { toast } from "@/components/ui/use-toast"
@@ -59,18 +60,22 @@ export default function StudentApplicationsPage() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-gray-50">
+    <div className="flex min-h-screen flex-col dashboard-shell">
       <StudentDashboardHeader />
-      <main className="flex-1 p-6 md:p-10">
-        <div className="grid gap-6">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">My Applications</h1>
-            <p className="text-muted-foreground">Track and manage your research project applications</p>
-          </div>
+      <main className="flex-1 px-4 py-8 md:px-6">
+        <div className="container mx-auto grid gap-6">
+          <section className="dashboard-hero rounded-lg p-6 text-white md:p-8">
+            <p className="text-sm font-medium uppercase tracking-[0.24em] text-cyan-100">Student Applications</p>
+            <h1 className="mt-3 text-3xl font-semibold tracking-tight md:text-5xl">My Applications</h1>
+            <p className="mt-4 max-w-2xl text-sm leading-6 text-slate-100 md:text-base">
+              Track and manage your research project applications.
+            </p>
+          </section>
 
+          <section className="dashboard-panel rounded-lg p-4">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList>
+              <TabsList className="grid h-auto w-full grid-cols-2 gap-1 rounded-lg border border-slate-200 bg-white/90 p-1 shadow-sm md:w-auto md:grid-cols-4">
                 <TabsTrigger value="all">All Applications</TabsTrigger>
                 <TabsTrigger value="pending">Pending</TabsTrigger>
                 <TabsTrigger value="approved">Approved</TabsTrigger>
@@ -81,17 +86,18 @@ export default function StudentApplicationsPage() {
               <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Search applications..."
-                className="pl-8"
+                className="bg-white/90 pl-8"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
           </div>
+          </section>
 
           {loading ? (
             <div className="space-y-4">
               {[1, 2, 3].map((i) => (
-                <Card key={i} className="animate-pulse">
+                <Card key={i} className="dashboard-panel animate-pulse rounded-lg">
                   <CardHeader>
                     <div className="h-6 bg-gray-200 rounded w-3/4 mb-2"></div>
                     <div className="h-4 bg-gray-200 rounded w-1/2"></div>
@@ -104,12 +110,12 @@ export default function StudentApplicationsPage() {
               ))}
             </div>
           ) : filteredApplications.length === 0 ? (
-            <Card>
+            <Card className="dashboard-panel rounded-lg">
               <CardContent className="flex flex-col items-center justify-center py-10">
                 <p className="text-muted-foreground mb-4">No applications found</p>
-                <Link href="/projects">
-                  <Button>Browse Projects</Button>
-                </Link>
+                <Button asChild>
+                  <Link href="/projects">Browse Projects</Link>
+                </Button>
               </CardContent>
             </Card>
           ) : (
@@ -117,7 +123,7 @@ export default function StudentApplicationsPage() {
               {filteredApplications.map((application) => (
                 <Card
                   key={application.id}
-                  className={`border-l-4 ${
+                  className={`dashboard-panel dashboard-lift rounded-lg border-l-4 ${
                     application.status === "approved"
                       ? "border-l-green-500"
                       : application.status === "rejected"
@@ -127,9 +133,20 @@ export default function StudentApplicationsPage() {
                 >
                   <CardHeader>
                     <div className="flex justify-between items-start">
-                      <div>
-                        <CardTitle>{application.project_title}</CardTitle>
-                        <CardDescription className="mt-1">Faculty: {application.faculty_name}</CardDescription>
+                      <div className="flex items-start gap-3">
+                        <Avatar className="h-10 w-10">
+                          <AvatarImage src={application.faculty_avatar || ""} alt={application.faculty_name} />
+                          <AvatarFallback>
+                            {application.faculty_name
+                              .split(" ")
+                              .map((name: string) => name[0])
+                              .join("")}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <CardTitle>{application.project_title}</CardTitle>
+                          <CardDescription className="mt-1">Faculty: {application.faculty_name}</CardDescription>
+                        </div>
                       </div>
                       <Badge className={getStatusBadgeVariant(application.status)}>
                         {application.status.charAt(0).toUpperCase() + application.status.slice(1)}
@@ -162,9 +179,9 @@ export default function StudentApplicationsPage() {
                     )}
                   </CardContent>
                   <CardFooter>
-                    <Link href={`/projects/${application.project_id}`}>
-                      <Button variant="outline">View Project</Button>
-                    </Link>
+                    <Button asChild variant="outline">
+                      <Link href={`/projects/${application.project_id}`}>View Project</Link>
+                    </Button>
                   </CardFooter>
                 </Card>
               ))}

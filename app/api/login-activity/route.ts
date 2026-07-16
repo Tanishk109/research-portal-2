@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server"
 import { connectToMongoDB } from "@/lib/mongodb"
-import { LoginActivity, User } from "@/lib/models"
+import { LoginActivity } from "@/lib/models"
 import { createApiResponse, handleApiError } from "@/lib/api-utils"
 import { cache } from '@/lib/cache'
 import { toObjectId, toPlainObject } from "@/lib/db"

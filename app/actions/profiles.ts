@@ -4,12 +4,13 @@ import { connectToMongoDB } from "@/lib/mongodb"
 import { User, FacultyProfile, StudentProfile } from "@/lib/models"
 import { getCurrentUser } from "./auth"
 import { revalidatePath } from "next/cache"
-import { toObjectId, toPlainObject } from "@/lib/db"
+import { toObjectId } from "@/lib/db"
 
 export type StudentProfileData = {
   firstName: string
   lastName: string
   email: string
+  profilePictureUrl?: string
   registrationNumber: string
   department: string
   year: string
@@ -22,6 +23,7 @@ export type FacultyProfileData = {
   firstName: string
   lastName: string
   email: string
+  profilePictureUrl?: string
   facultyId: string
   department: string
   specialization: string
@@ -29,6 +31,28 @@ export type FacultyProfileData = {
   dateOfBirth: string
   phone?: string
   bio?: string
+}
+
+const PROFILE_IMAGE_DATA_URL_PATTERN = /^data:image\/(png|jpeg|jpg|webp);base64,/
+const MAX_PROFILE_IMAGE_DATA_URL_LENGTH = 3 * 1024 * 1024
+
+function getProfilePictureUpdate(profilePictureUrl: string | undefined) {
+  if (profilePictureUrl === undefined) {
+    return { success: true as const, value: undefined }
+  }
+
+  if (!profilePictureUrl) {
+    return { success: true as const, value: "" }
+  }
+
+  if (
+    profilePictureUrl.length > MAX_PROFILE_IMAGE_DATA_URL_LENGTH ||
+    !PROFILE_IMAGE_DATA_URL_PATTERN.test(profilePictureUrl)
+  ) {
+    return { success: false as const, message: "Please upload a PNG, JPG, or WebP image up to 2MB." }
+  }
+
+  return { success: true as const, value: profilePictureUrl }
 }
 
 // Get current user's profile data
@@ -62,6 +86,7 @@ export async function getCurrentUserProfile() {
           first_name: user.first_name,
           last_name: user.last_name,
           email: user.email,
+          profile_picture_url: user.profile_picture_url || null,
           registration_number: studentProfile.registration_number,
           department: studentProfile.department,
           year: studentProfile.year,
@@ -84,6 +109,7 @@ export async function getCurrentUserProfile() {
           first_name: user.first_name,
           last_name: user.last_name,
           email: user.email,
+          profile_picture_url: user.profile_picture_url || null,
           faculty_id: facultyProfile.faculty_id,
           department: facultyProfile.department,
           specialization: facultyProfile.specialization,
@@ -123,13 +149,23 @@ export async function updateStudentProfile(data: StudentProfileData) {
       return { success: false, message: "Invalid user ID" }
     }
 
-    // Update user
-    await User.findByIdAndUpdate(userId, {
+    const profilePictureUpdate = getProfilePictureUpdate(data.profilePictureUrl)
+    if (!profilePictureUpdate.success) {
+      return { success: false, message: profilePictureUpdate.message }
+    }
+
+    const userUpdate: Record<string, unknown> = {
       first_name: data.firstName,
       last_name: data.lastName,
       email: data.email,
       updated_at: new Date(),
-    })
+    }
+
+    if (profilePictureUpdate.value !== undefined) {
+      userUpdate.profile_picture_url = profilePictureUpdate.value || undefined
+    }
+
+    await User.findByIdAndUpdate(userId, userUpdate)
 
     const updatedProfile = await StudentProfile.findOneAndUpdate(
       { user_id: userId },
@@ -180,13 +216,23 @@ export async function updateFacultyProfile(data: FacultyProfileData) {
       return { success: false, message: "Invalid user ID" }
     }
 
-    // Update user
-    await User.findByIdAndUpdate(userId, {
+    const profilePictureUpdate = getProfilePictureUpdate(data.profilePictureUrl)
+    if (!profilePictureUpdate.success) {
+      return { success: false, message: profilePictureUpdate.message }
+    }
+
+    const userUpdate: Record<string, unknown> = {
       first_name: data.firstName,
       last_name: data.lastName,
       email: data.email,
       updated_at: new Date(),
-    })
+    }
+
+    if (profilePictureUpdate.value !== undefined) {
+      userUpdate.profile_picture_url = profilePictureUpdate.value || undefined
+    }
+
+    await User.findByIdAndUpdate(userId, userUpdate)
 
     const updatedProfile = await FacultyProfile.findOneAndUpdate(
       { user_id: userId },

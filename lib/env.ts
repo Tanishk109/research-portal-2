@@ -6,6 +6,12 @@ export const IS_DB_CONFIGURED = MONGODB_URI.startsWith("mongodb://") || MONGODB_
 export const JWT_SECRET = process.env.JWT_SECRET || "your-super-secret-jwt-key-change-in-production"
 export const JWT_EXPIRATION = process.env.JWT_EXPIRATION || "7d"
 
+// Google OAuth configuration
+export const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || ""
+export const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || ""
+export const GOOGLE_REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI || ""
+export const IS_GOOGLE_AUTH_CONFIGURED = !!GOOGLE_CLIENT_ID && !!GOOGLE_CLIENT_SECRET
+
 // Cookie settings
 export const COOKIE_SETTINGS = {
   httpOnly: true,

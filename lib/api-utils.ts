@@ -1,6 +1,4 @@
 import { type NextRequest, NextResponse } from "next/server"
-import jwt from "jsonwebtoken"
-import { JWT_SECRET } from "./env"
 
 // API Response types
 export interface ApiResponse<T = any> {
@@ -75,30 +73,12 @@ export function validateRequiredFields(
 
 // Get user ID from JWT token in request
 export function getUserIdFromRequest(request: NextRequest): string | null {
-  try {
-    const token = request.cookies.get("auth-token")?.value
-    if (!token) return null
-
-    const decoded = jwt.verify(token, JWT_SECRET) as any
-    return decoded.userId || null
-  } catch (error) {
-    console.error("Failed to get user ID from request:", error)
-    return null
-  }
+  return request.headers.get("x-user-id")
 }
 
 // Get user role from JWT token in request
 export function getUserRoleFromRequest(request: NextRequest): string | null {
-  try {
-    const token = request.cookies.get("auth-token")?.value
-    if (!token) return null
-
-    const decoded = jwt.verify(token, JWT_SECRET) as any
-    return decoded.role || null
-  } catch (error) {
-    console.error("Failed to get user role from request:", error)
-    return null
-  }
+  return request.headers.get("x-user-role")
 }
 
 // Get client IP address

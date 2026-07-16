@@ -50,6 +50,7 @@ export async function GET(request: NextRequest) {
         firstName: user.first_name,
         lastName: user.last_name,
         email: user.email,
+        profilePictureUrl: user.profile_picture_url || null,
         name: `${user.first_name} ${user.last_name}`,
         createdAt: user.created_at,
         updatedAt: user.updated_at,

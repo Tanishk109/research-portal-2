@@ -1,17 +1,18 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import Image from "next/image"
 import Link from "next/link"
 import { Card, CardHeader, CardContent, CardFooter, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 
 export type FacultyDirectoryEntry = {
   id: string
   first_name: string
   last_name: string
   email: string
+  profile_picture_url?: string | null
   department: string
   specialization: string
 }
@@ -63,13 +64,15 @@ export function FacultyDirectoryClient({ faculty }: { faculty: FacultyDirectoryE
                 className="flex flex-col items-center p-6 bg-white/80 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1"
               >
                 <CardHeader className="flex flex-col items-center pb-2">
-                  <Image
-                    src="/placeholder-user.jpg"
-                    alt="Faculty photo"
-                    width={80}
-                    height={80}
-                    className="rounded-full mb-4 border-2 border-primary-200"
-                  />
+                  <Avatar className="mb-4 h-20 w-20 border-2 border-primary-200">
+                    <AvatarImage
+                      src={member.profile_picture_url || ""}
+                      alt={`${member.first_name} ${member.last_name}`}
+                    />
+                    <AvatarFallback>
+                      {`${member.first_name?.charAt(0) || ""}${member.last_name?.charAt(0) || ""}`}
+                    </AvatarFallback>
+                  </Avatar>
                   <CardTitle className="text-xl font-semibold mb-1 text-center">
                     {member.first_name} {member.last_name}
                   </CardTitle>

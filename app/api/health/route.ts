@@ -1,5 +1,4 @@
 import { testDatabaseConnection, getDatabaseInfo } from "@/lib/db"
-import { createApiResponse, handleApiError } from "@/lib/api-utils"
 import { cache } from '@/lib/cache'
 import { connectToMongoDB } from "@/lib/mongodb"
 import { User, FacultyProfile, StudentProfile, Project, Application, LoginActivity } from "@/lib/models"

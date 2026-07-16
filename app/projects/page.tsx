@@ -195,7 +195,7 @@ export default function ProjectsPage() {
                         <CardTitle className="text-xl">{project.title}</CardTitle>
                         <div className="flex items-center gap-2 mt-2">
                           <Avatar className="h-6 w-6">
-                            <AvatarImage src="/placeholder.svg?height=40&width=40" alt={project.faculty_name} />
+                            <AvatarImage src={project.faculty_avatar || ""} alt={project.faculty_name} />
                             <AvatarFallback>
                               {project.faculty_name
                                 .split(" ")

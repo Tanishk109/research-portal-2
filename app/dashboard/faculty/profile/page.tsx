@@ -1,32 +1,57 @@
 "use client"
 
+import type React from "react"
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Upload } from "lucide-react"
 import { toast } from "sonner"
-import { getCurrentUserProfile } from "@/app/actions/profiles"
 import type { FacultyProfileData } from "@/app/actions/profiles"
-import dynamic from "next/dynamic"
-import useSWR from "swr"
-import Image from "next/image"
+import FacultyDashboardHeader from "@/components/faculty-dashboard-header"
 
-const FacultyDashboardHeader = dynamic(() => import("@/components/faculty-dashboard-header"), { ssr: false })
+const MAX_PROFILE_IMAGE_BYTES = 2 * 1024 * 1024
 
-const fetcher = (url: string) => fetch(url).then(res => res.json())
+function formatDateInputValue(value: unknown) {
+  if (!value) {
+    return ""
+  }
+
+  const textValue = String(value)
+  if (/^\d{4}-\d{2}-\d{2}$/.test(textValue)) {
+    return textValue
+  }
+
+  const date = new Date(textValue)
+  if (Number.isNaN(date.getTime())) {
+    return ""
+  }
+
+  return date.toISOString().slice(0, 10)
+}
+
+function readFileAsDataUrl(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(String(reader.result))
+    reader.onerror = () => reject(reader.error)
+    reader.readAsDataURL(file)
+  })
+}
 
 export default function FacultyProfilePage() {
-  const [profile, setProfile] = useState<FacultyProfileData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
-  const [isEditing, setIsEditing] = useState(false)
+  const [isSavingPhoto, setIsSavingPhoto] = useState(false)
   const [formData, setFormData] = useState<FacultyProfileData>({
     firstName: "",
     lastName: "",
     email: "",
+    profilePictureUrl: "",
     facultyId: "",
     department: "",
     specialization: "",
@@ -36,8 +61,6 @@ export default function FacultyProfilePage() {
     bio: "",
   })
 
-  const { data, error, isLoading: swrLoading } = useSWR("/api/dashboard/faculty/profile", fetcher, { refreshInterval: 30000 })
-
   useEffect(() => {
     loadProfile()
   }, [])
@@ -45,20 +68,21 @@ export default function FacultyProfilePage() {
   const loadProfile = async () => {
     try {
       setIsLoading(true)
-      const result = await getCurrentUserProfile()
+      const res = await fetch("/api/dashboard/faculty/profile")
+      const result = await res.json()
       
-      if (result.success && result.profile) {
+      if (res.ok && result.success && result.profile) {
         const profileData = result.profile
-        setProfile(profileData as any)
         setFormData({
           firstName: (profileData as any).first_name || "",
           lastName: (profileData as any).last_name || "",
           email: profileData.email || "",
+          profilePictureUrl: (profileData as any).profile_picture_url || "",
           facultyId: (profileData as any).faculty_id || "",
           department: profileData.department || "",
           specialization: profileData.specialization || "",
-          dateOfJoining: (profileData as any).date_of_joining || "",
-          dateOfBirth: (profileData as any).date_of_birth || "",
+          dateOfJoining: formatDateInputValue((profileData as any).date_of_joining),
+          dateOfBirth: formatDateInputValue((profileData as any).date_of_birth),
           phone: profileData.phone || "",
           bio: profileData.bio || "",
         })
@@ -85,7 +109,6 @@ export default function FacultyProfilePage() {
       
       if (res.ok && result.success) {
         toast.success("Profile updated successfully")
-        setIsEditing(false)
         await loadProfile() // Reload to get updated data
       } else {
         toast.error(result.message || "Failed to update profile")
@@ -98,90 +121,155 @@ export default function FacultyProfilePage() {
     }
   }
 
-  const handleCancel = () => {
-    if (profile) {
-      setFormData({
-        firstName: (profile as any).first_name || "",
-        lastName: (profile as any).last_name || "",
-        email: profile.email || "",
-        facultyId: (profile as any).faculty_id || "",
-        department: profile.department || "",
-        specialization: profile.specialization || "",
-        dateOfJoining: (profile as any).date_of_joining || "",
-        dateOfBirth: (profile as any).date_of_birth || "",
-        phone: profile.phone || "",
-        bio: profile.bio || "",
-      })
-    }
-    setIsEditing(false)
-  }
-
   const handleInputChange = (field: keyof FacultyProfileData, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }))
   }
 
+  const handleProfilePictureUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const input = e.currentTarget
+    const file = input.files?.[0]
+
+    if (!file) {
+      return
+    }
+
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please upload a PNG, JPG, or WebP image.")
+      input.value = ""
+      return
+    }
+
+    if (file.size > MAX_PROFILE_IMAGE_BYTES) {
+      toast.error("Please upload a professional photo up to 2MB.")
+      input.value = ""
+      return
+    }
+
+    try {
+      setIsSavingPhoto(true)
+      const profilePictureUrl = await readFileAsDataUrl(file)
+      const nextFormData = { ...formData, profilePictureUrl }
+      const res = await fetch("/api/dashboard/faculty/profile", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(nextFormData),
+      })
+      const result = await res.json()
+
+      if (res.ok && result.success) {
+        setFormData(nextFormData)
+        window.dispatchEvent(new CustomEvent("profile-picture-updated", { detail: profilePictureUrl }))
+        toast.success("Profile photo uploaded successfully")
+      } else {
+        toast.error(result.message || "Failed to upload profile photo")
+      }
+    } catch (error) {
+      console.error("Error uploading profile photo:", error)
+      toast.error("Failed to upload profile photo")
+    } finally {
+      setIsSavingPhoto(false)
+      input.value = ""
+    }
+  }
+
   if (isLoading) {
     return (
-      <div className="container mx-auto py-8">
-        <div className="max-w-4xl mx-auto space-y-6">
-          <div className="animate-pulse">
-            <div className="h-8 bg-gray-200 rounded w-1/4 mb-4"></div>
-            <div className="h-4 bg-gray-200 rounded w-1/2 mb-8"></div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {[...Array(8)].map((_, i) => (
-                <div key={i} className="h-20 bg-gray-200 rounded"></div>
-              ))}
+      <div className="flex min-h-screen flex-col faculty-shell">
+        <FacultyDashboardHeader />
+        <main className="flex-1 px-4 py-8 md:px-6">
+          <div className="mx-auto max-w-5xl space-y-6">
+            <div className="faculty-panel animate-pulse rounded-lg p-6">
+              <div className="h-8 w-56 rounded bg-slate-200"></div>
+              <div className="mt-3 h-4 w-80 rounded bg-slate-200"></div>
+              <div className="mt-8 grid grid-cols-1 gap-6 md:grid-cols-2">
+                {[...Array(8)].map((_, i) => (
+                  <div key={i} className="space-y-2">
+                    <div className="h-4 w-24 rounded bg-slate-200"></div>
+                    <div className="h-10 rounded bg-slate-200"></div>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
-        </div>
+        </main>
       </div>
     )
   }
 
   return (
-    <div className="container mx-auto py-8">
-      <div className="max-w-4xl mx-auto space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Faculty Profile</h1>
-          <p className="text-muted-foreground">
-            Manage your faculty profile information and preferences.
-          </p>
-        </div>
-
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
+    <div className="flex min-h-screen flex-col faculty-shell">
+      <FacultyDashboardHeader />
+      <main className="flex-1 px-4 py-8 md:px-6">
+        <div className="mx-auto max-w-5xl space-y-6">
+          <div className="faculty-hero rounded-lg p-6 text-white md:p-8">
+            <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
               <div>
-                <CardTitle>Personal Information</CardTitle>
+                <p className="text-sm font-medium uppercase tracking-[0.24em] text-cyan-100">Faculty Profile</p>
+                <h1 className="mt-3 text-3xl font-semibold tracking-tight md:text-5xl">Personal Details</h1>
+                <p className="mt-4 max-w-2xl text-sm leading-6 text-slate-100 md:text-base">
+                  Keep your academic identity, contact details, and research background current across the portal.
+                </p>
+              </div>
+              <Button onClick={handleSave} disabled={isSaving} className="w-full bg-white text-slate-950 shadow-lg shadow-slate-950/20 hover:bg-slate-100 md:w-auto">
+                {isSaving ? "Saving..." : "Save Changes"}
+              </Button>
+            </div>
+          </div>
+
+        <Card className="faculty-panel-strong rounded-lg">
+          <CardHeader>
+            <div className="flex flex-col gap-1">
+              <div>
+                <CardTitle>Profile Information</CardTitle>
                 <CardDescription>
                   Update your personal and academic information
                 </CardDescription>
               </div>
-              {!isEditing ? (
-                <Button onClick={() => setIsEditing(true)}>
-                  Edit Profile
-                </Button>
-              ) : (
-                <div className="flex gap-2">
-                  <Button variant="outline" onClick={handleCancel}>
-                    Cancel
-                  </Button>
-                  <Button onClick={handleSave} disabled={isSaving}>
-                    {isSaving ? "Saving..." : "Save Changes"}
-                  </Button>
-                </div>
-              )}
             </div>
           </CardHeader>
           <CardContent className="space-y-6">
+            <div className="rounded-lg border border-slate-200/80 bg-white/75 p-5 shadow-sm">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+                <Avatar className="h-24 w-24 border-4 border-white shadow-sm">
+                  <AvatarImage
+                    src={formData.profilePictureUrl || "/placeholder.svg?height=96&width=96"}
+                    alt={`${formData.firstName} ${formData.lastName}`.trim() || "Faculty profile"}
+                  />
+                  <AvatarFallback className="bg-primary text-xl text-white">
+                    {`${formData.firstName?.[0] || ""}${formData.lastName?.[0] || ""}`.toUpperCase() || "FA"}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="space-y-2">
+                  <div>
+                    <p className="text-sm font-medium text-slate-900">Professional Picture</p>
+                    <p className="text-sm text-muted-foreground">Use a clear, professional photo for your profile.</p>
+                  </div>
+                  <input
+                    id="faculty-profile-photo"
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    className="sr-only"
+                    onChange={handleProfilePictureUpload}
+                    disabled={isSavingPhoto}
+                  />
+                  <Button variant="outline" size="sm" asChild>
+                    <Label htmlFor="faculty-profile-photo" className="cursor-pointer bg-white/80">
+                      <Upload className="mr-2 h-4 w-4" />
+                      {isSavingPhoto ? "Uploading..." : "Upload Photo"}
+                    </Label>
+                  </Button>
+                </div>
+              </div>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
                 <Label htmlFor="firstName">First Name</Label>
                 <Input
                   id="firstName"
+                  className="bg-white/90"
                   value={formData.firstName}
                   onChange={(e) => handleInputChange("firstName", e.target.value)}
-                  disabled={!isEditing}
                 />
               </div>
 
@@ -189,9 +277,9 @@ export default function FacultyProfilePage() {
                 <Label htmlFor="lastName">Last Name</Label>
                 <Input
                   id="lastName"
+                  className="bg-white/90"
                   value={formData.lastName}
                   onChange={(e) => handleInputChange("lastName", e.target.value)}
-                  disabled={!isEditing}
                 />
               </div>
 
@@ -200,9 +288,9 @@ export default function FacultyProfilePage() {
                 <Input
                   id="email"
                   type="email"
+                  className="bg-white/90"
                   value={formData.email}
                   onChange={(e) => handleInputChange("email", e.target.value)}
-                  disabled={!isEditing}
                 />
               </div>
 
@@ -210,9 +298,9 @@ export default function FacultyProfilePage() {
                 <Label htmlFor="facultyId">Faculty ID</Label>
                 <Input
                   id="facultyId"
+                  className="bg-white/90"
                   value={formData.facultyId}
                   onChange={(e) => handleInputChange("facultyId", e.target.value)}
-                  disabled={!isEditing}
                 />
               </div>
 
@@ -221,9 +309,8 @@ export default function FacultyProfilePage() {
                 <Select
                   value={formData.department}
                   onValueChange={(value) => handleInputChange("department", value)}
-                  disabled={!isEditing}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="bg-white/90">
                     <SelectValue placeholder="Select department" />
                   </SelectTrigger>
                   <SelectContent>
@@ -245,9 +332,9 @@ export default function FacultyProfilePage() {
                 <Label htmlFor="specialization">Specialization</Label>
                 <Input
                   id="specialization"
+                  className="bg-white/90"
                   value={formData.specialization}
                   onChange={(e) => handleInputChange("specialization", e.target.value)}
-                  disabled={!isEditing}
                 />
               </div>
 
@@ -256,9 +343,9 @@ export default function FacultyProfilePage() {
                 <Input
                   id="dateOfJoining"
                   type="date"
+                  className="bg-white/90"
                   value={formData.dateOfJoining}
                   onChange={(e) => handleInputChange("dateOfJoining", e.target.value)}
-                  disabled={!isEditing}
                 />
               </div>
 
@@ -267,9 +354,9 @@ export default function FacultyProfilePage() {
                 <Input
                   id="dateOfBirth"
                   type="date"
+                  className="bg-white/90"
                   value={formData.dateOfBirth}
                   onChange={(e) => handleInputChange("dateOfBirth", e.target.value)}
-                  disabled={!isEditing}
                 />
               </div>
 
@@ -278,9 +365,9 @@ export default function FacultyProfilePage() {
                 <Input
                   id="phone"
                   type="tel"
+                  className="bg-white/90"
                   value={formData.phone}
                   onChange={(e) => handleInputChange("phone", e.target.value)}
-                  disabled={!isEditing}
                   placeholder="+91 98765 43210"
                 />
               </div>
@@ -290,16 +377,22 @@ export default function FacultyProfilePage() {
               <Label htmlFor="bio">Bio</Label>
               <Textarea
                 id="bio"
+                className="bg-white/90"
                 value={formData.bio}
                 onChange={(e) => handleInputChange("bio", e.target.value)}
-                disabled={!isEditing}
                 placeholder="Tell us about your research interests and experience..."
                 rows={4}
               />
             </div>
           </CardContent>
+          <div className="flex justify-end border-t border-slate-200/80 px-6 py-4">
+            <Button onClick={handleSave} disabled={isSaving}>
+              {isSaving ? "Saving..." : "Save Changes"}
+            </Button>
+          </div>
         </Card>
-      </div>
+        </div>
+      </main>
     </div>
   )
 } 

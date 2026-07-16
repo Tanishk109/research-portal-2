@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useParams, useRouter } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -13,14 +13,17 @@ import { useToast } from "@/components/ui/use-toast"
 import { ArrowLeft, Calendar, FileText, GraduationCap, User } from "lucide-react"
 import FacultyDashboardHeader from "@/components/faculty-dashboard-header"
 
-export default function ApplicationDetailsPage({ params }: { params: { id: string } }) {
-  const id = params.id
+export default function ApplicationDetailsPage() {
+  const params = useParams<{ id: string }>()
+  const id = params?.id
   const router = useRouter()
   const { toast } = useToast()
   const [loading, setLoading] = useState(true)
   const [application, setApplication] = useState<any>(null)
   const [feedback, setFeedback] = useState("")
   const [processing, setProcessing] = useState(false)
+
+  const resume = application?.student?.resume
 
   useEffect(() => {
     const fetchData = async () => {
@@ -60,9 +63,12 @@ export default function ApplicationDetailsPage({ params }: { params: { id: strin
       }
     }
 
-    if (id) {
-      fetchData()
+    if (!id) {
+      setLoading(false)
+      return
     }
+
+    fetchData()
   }, [id, toast])
 
   const handleUpdateStatus = async (status: "approved" | "rejected") => {
@@ -110,18 +116,18 @@ export default function ApplicationDetailsPage({ params }: { params: { id: strin
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-gray-50">
+    <div className="flex min-h-screen flex-col dashboard-shell">
       <FacultyDashboardHeader />
-      <main className="flex-1 p-6 md:p-10">
-        <div className="mb-6">
-          <Link href="/dashboard/faculty" className="inline-flex items-center text-primary hover:underline">
+      <main className="flex-1 px-4 py-8 md:px-6">
+        <div className="container mx-auto mb-6">
+          <Link href="/dashboard/faculty/applications" className="inline-flex items-center text-sm font-medium text-slate-600 hover:text-slate-950">
             <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Dashboard
+            Back to Applications
           </Link>
         </div>
 
         {loading ? (
-          <div className="grid gap-6">
+          <div className="container mx-auto grid gap-6">
             <Skeleton className="h-10 w-3/4" />
             <div className="grid gap-6 md:grid-cols-3">
               <Skeleton className="h-40" />
@@ -130,14 +136,17 @@ export default function ApplicationDetailsPage({ params }: { params: { id: strin
             <Skeleton className="h-60" />
           </div>
         ) : application ? (
-          <div className="grid gap-6">
-            <div>
-              <h1 className="text-3xl font-bold tracking-tight text-primary">Application Details</h1>
-              <p className="text-muted-foreground">Review student application for your research project</p>
-            </div>
+          <div className="container mx-auto grid gap-6">
+            <section className="dashboard-hero rounded-lg p-6 text-white md:p-8">
+              <p className="text-sm font-medium uppercase tracking-[0.24em] text-cyan-100">Application Review</p>
+              <h1 className="mt-3 text-3xl font-semibold tracking-tight md:text-5xl">Application Details</h1>
+              <p className="mt-4 max-w-2xl text-sm leading-6 text-slate-100 md:text-base">
+                Review student application details and provide feedback from the same faculty workspace.
+              </p>
+            </section>
 
             <div className="grid gap-6 md:grid-cols-3">
-              <Card>
+              <Card className="dashboard-panel rounded-lg">
                 <CardHeader>
                   <CardTitle className="text-lg">Student Information</CardTitle>
                 </CardHeader>
@@ -145,7 +154,7 @@ export default function ApplicationDetailsPage({ params }: { params: { id: strin
                   <div className="flex items-center gap-4">
                     <Avatar className="h-16 w-16">
                       <AvatarImage
-                        src={`/placeholder.svg?height=64&width=64&text=${application.student.name.charAt(0)}`}
+                        src={application.student.avatar || ""}
                         alt={application.student.name}
                       />
                       <AvatarFallback className="text-lg bg-secondary text-primary">
@@ -175,10 +184,37 @@ export default function ApplicationDetailsPage({ params }: { params: { id: strin
                       <span>CGPA: {application.student.cgpa}</span>
                     </div>
                   </div>
+
+                  <div className="rounded-lg border border-slate-200/80 bg-white/75 p-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium">Resume</p>
+                        <p className="mt-1 truncate text-xs text-muted-foreground">
+                          {resume
+                            ? `${resume.file_name || "Resume.pdf"}${
+                                resume.uploaded_at ? ` • uploaded ${new Date(resume.uploaded_at).toLocaleDateString()}` : ""
+                              }`
+                            : "No PDF resume uploaded yet"}
+                        </p>
+                      </div>
+                      {resume ? (
+                        <Button asChild variant="outline" size="sm" className="shrink-0 bg-white/90">
+                          <a href={resume.file_url} target="_blank" rel="noopener noreferrer">
+                            <FileText className="mr-2 h-4 w-4" />
+                            View PDF
+                          </a>
+                        </Button>
+                      ) : (
+                        <Badge variant="outline" className="shrink-0 bg-white/80">
+                          Missing
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
 
-              <Card className="md:col-span-2">
+              <Card className="dashboard-panel rounded-lg md:col-span-2">
                 <CardHeader>
                   <CardTitle className="text-lg">Project Information</CardTitle>
                 </CardHeader>
@@ -225,19 +261,19 @@ export default function ApplicationDetailsPage({ params }: { params: { id: strin
               </Card>
             </div>
 
-            <Card>
+            <Card className="dashboard-panel rounded-lg">
               <CardHeader>
                 <CardTitle className="text-lg">Application Message</CardTitle>
                 <CardDescription>Submitted on {new Date(application.applied_at).toLocaleDateString()}</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="p-4 bg-gray-50 rounded-md border">
+                <div className="rounded-lg border border-slate-200/80 bg-white/75 p-4">
                   <p className="whitespace-pre-wrap">{application.message}</p>
                 </div>
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="dashboard-panel-strong rounded-lg">
               <CardHeader>
                 <CardTitle className="text-lg">Your Feedback</CardTitle>
                 <CardDescription>Provide feedback to the student about their application</CardDescription>
@@ -245,7 +281,7 @@ export default function ApplicationDetailsPage({ params }: { params: { id: strin
               <CardContent>
                 <Textarea
                   placeholder="Enter your feedback here..."
-                  className="min-h-[100px]"
+                  className="min-h-[100px] bg-white/90"
                   value={feedback}
                   onChange={(e) => setFeedback(e.target.value)}
                   disabled={application.status !== "pending" || processing}
@@ -255,14 +291,14 @@ export default function ApplicationDetailsPage({ params }: { params: { id: strin
                 <CardFooter className="flex justify-end gap-4">
                   <Button
                     variant="outline"
-                    className="border-red-500 text-red-500 hover:bg-red-50"
+                    className="border-red-200 bg-white/80 text-red-600 hover:bg-red-50"
                     onClick={() => handleUpdateStatus("rejected")}
                     disabled={processing}
                   >
                     Reject Application
                   </Button>
                   <Button
-                    className="bg-primary hover:bg-primary/90"
+                    className="shadow-lg shadow-blue-600/20"
                     onClick={() => handleUpdateStatus("approved")}
                     disabled={processing}
                   >
@@ -273,7 +309,7 @@ export default function ApplicationDetailsPage({ params }: { params: { id: strin
             </Card>
           </div>
         ) : (
-          <div className="flex flex-col items-center justify-center py-10 text-center">
+          <div className="dashboard-panel mx-auto flex max-w-3xl flex-col items-center justify-center rounded-lg py-12 text-center">
             <FileText className="h-10 w-10 text-muted-foreground mb-4" />
             <h3 className="text-lg font-medium">Application not found</h3>
             <p className="text-muted-foreground mt-1">

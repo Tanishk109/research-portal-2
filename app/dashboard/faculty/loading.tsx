@@ -3,9 +3,9 @@ import FacultyDashboardHeader from "@/components/faculty-dashboard-header"
 
 export default function Loading() {
   return (
-    <div className="flex min-h-screen flex-col bg-gray-50">
+    <div className="flex min-h-screen flex-col dashboard-shell">
       <FacultyDashboardHeader />
-      <main className="flex-1 p-6 md:p-10">
+      <main className="flex-1 px-4 py-8 md:px-6">
         <div className="grid gap-6">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
@@ -17,7 +17,7 @@ export default function Loading() {
 
           <div className="grid gap-6 md:grid-cols-3">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="border rounded-lg p-4 bg-white">
+              <div key={i} className="dashboard-panel rounded-lg p-4">
                 <div className="flex justify-between items-center mb-4">
                   <Skeleton className="h-5 w-32 bg-gray-200" />
                   <Skeleton className="h-4 w-4 bg-gray-200" />
@@ -28,7 +28,7 @@ export default function Loading() {
             ))}
           </div>
 
-          <div className="border rounded-lg p-4 bg-white">
+          <div className="dashboard-panel rounded-lg p-4">
             <div className="flex mb-6">
               <Skeleton className="h-10 w-32 mr-2 bg-gray-200" />
               <Skeleton className="h-10 w-32 bg-gray-200" />

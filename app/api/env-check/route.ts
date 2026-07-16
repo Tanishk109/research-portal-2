@@ -1,5 +1,13 @@
 import { NextResponse } from "next/server"
-import { MONGODB_URI, JWT_SECRET, JWT_EXPIRATION, IS_DB_CONFIGURED } from "@/lib/env"
+import {
+  MONGODB_URI,
+  JWT_SECRET,
+  JWT_EXPIRATION,
+  IS_DB_CONFIGURED,
+  GOOGLE_CLIENT_ID,
+  GOOGLE_REDIRECT_URI,
+  IS_GOOGLE_AUTH_CONFIGURED,
+} from "@/lib/env"
 
 export async function GET() {
   // Mask sensitive values for security
@@ -18,6 +26,9 @@ export async function GET() {
       JWT_SECRET: maskedJwtSecret,
       JWT_EXPIRATION: JWT_EXPIRATION || "not set",
       IS_DB_CONFIGURED: IS_DB_CONFIGURED,
+      GOOGLE_CLIENT_ID: GOOGLE_CLIENT_ID ? `${GOOGLE_CLIENT_ID.slice(0, 8)}...` : "Not configured",
+      GOOGLE_REDIRECT_URI: GOOGLE_REDIRECT_URI || "Default callback URL",
+      IS_GOOGLE_AUTH_CONFIGURED,
     },
   })
 }

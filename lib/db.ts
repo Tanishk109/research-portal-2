@@ -1,4 +1,4 @@
-import { connectToMongoDB, checkMongoDBHealth, getMongoDBInfo } from "./mongodb";
+import { checkMongoDBHealth, getMongoDBInfo } from "./mongodb";
 import bcrypt from "bcryptjs";
 import { ObjectId } from "mongodb";
 import mongoose from "mongoose";

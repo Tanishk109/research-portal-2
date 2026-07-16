@@ -15,7 +15,6 @@ import { Skeleton } from "@/components/ui/skeleton"
 import RecentLoginActivity from "@/components/recent-login-activity"
 import dynamic from "next/dynamic"
 import useSWR from "swr"
-import Image from "next/image"
 
 const StudentDashboardHeader = dynamic(() => import("@/components/student-dashboard-header"), { ssr: false })
 
@@ -29,7 +28,7 @@ export default function StudentDashboard() {
   const [searchTerm, setSearchTerm] = useState("")
   const [activeTab, setActiveTab] = useState("explore")
 
-  const { data, error, isLoading: swrLoading } = useSWR("/api/dashboard/student", fetcher, { refreshInterval: 30000 })
+  useSWR("/api/dashboard/student", fetcher, { refreshInterval: 30000 })
 
   // Fetch projects and applications in parallel
   useEffect(() => {
@@ -40,7 +39,7 @@ export default function StudentDashboard() {
         
         const [projectsRes, applicationsRes] = await Promise.all([
           fetch("/api/projects/active"),
-          fetch("/api/dashboard/student"),
+          fetch("/api/dashboard/student?limit=100"),
         ])
         const projectsJson = await projectsRes.json()
         const applicationsJson = await applicationsRes.json()
@@ -81,6 +80,9 @@ export default function StudentDashboard() {
       app.faculty_name.toLowerCase().includes(searchTerm.toLowerCase()),
   )
 
+  const getApplicationForProject = (projectId: string) =>
+    applications.find((application) => String(application.project_id) === String(projectId))
+
   // Get status badge variant
   const getStatusBadgeVariant = (status: string) => {
     switch (status) {
@@ -94,19 +96,20 @@ export default function StudentDashboard() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-gray-50">
+    <div className="flex min-h-screen flex-col dashboard-shell">
       <StudentDashboardHeader />
-      <main className="flex-1 p-6 md:p-10">
-        <div className="grid gap-6">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight text-[#0c2461]">Student Dashboard</h1>
-            <p className="text-muted-foreground">
+      <main className="flex-1 px-4 py-8 md:px-6">
+        <div className="container mx-auto grid gap-6">
+          <section className="dashboard-hero rounded-lg p-6 text-white md:p-8">
+            <p className="text-sm font-medium uppercase tracking-[0.24em] text-cyan-100">Student Workspace</p>
+            <h1 className="mt-3 text-3xl font-semibold tracking-tight md:text-5xl">Student Dashboard</h1>
+            <p className="mt-4 max-w-2xl text-sm leading-6 text-slate-100 md:text-base">
               Explore research opportunities and track your applications at Manipal University Jaipur
             </p>
-          </div>
+          </section>
 
           <div className="grid gap-6 md:grid-cols-3">
-            <Card className="border-t-4 border-t-[#0c2461]">
+            <Card className="dashboard-panel dashboard-lift rounded-lg">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Available Projects</CardTitle>
                 <FileText className="h-4 w-4 text-[#0c2461]" />
@@ -122,7 +125,7 @@ export default function StudentDashboard() {
                 )}
               </CardContent>
             </Card>
-            <Card className="border-t-4 border-t-[#e1b12c]">
+            <Card className="dashboard-panel dashboard-lift rounded-lg">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Your Applications</CardTitle>
                 <FileText className="h-4 w-4 text-[#e1b12c]" />
@@ -139,13 +142,8 @@ export default function StudentDashboard() {
                   </>
                 )}
               </CardContent>
-              <CardFooter className="p-0 pt-2">
-                <Link href="/dashboard/student/applications" className="text-xs text-[#e1b12c] hover:underline">
-                  View all applications
-                </Link>
-              </CardFooter>
             </Card>
-            <Card className="border-t-4 border-t-[#4a69bd]">
+            <Card className="dashboard-panel dashboard-lift rounded-lg">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Profile Completion</CardTitle>
                 <FileText className="h-4 w-4 text-[#4a69bd]" />
@@ -160,34 +158,28 @@ export default function StudentDashboard() {
           <div className="grid gap-6 md:grid-cols-3">
             <div className="md:col-span-2">
               <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-                <TabsList className="bg-white border">
-                  <TabsTrigger
-                    value="explore"
-                    className="data-[state=active]:bg-[#0c2461] data-[state=active]:text-white"
-                  >
+                <TabsList className="grid h-auto w-full grid-cols-1 gap-1 rounded-lg border border-slate-200 bg-white/90 p-1 shadow-sm sm:grid-cols-2">
+                  <TabsTrigger value="explore">
                     Explore Projects
                   </TabsTrigger>
-                  <TabsTrigger
-                    value="applications"
-                    className="data-[state=active]:bg-[#0c2461] data-[state=active]:text-white"
-                  >
+                  <TabsTrigger value="applications">
                     My Applications
                   </TabsTrigger>
                 </TabsList>
                 <TabsContent value="explore" className="space-y-4">
                   <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                    <h2 className="text-xl font-semibold text-[#0c2461]">Available Research Projects</h2>
+                    <h2 className="text-xl font-semibold text-slate-950">Available Research Projects</h2>
                     <div className="flex gap-2 w-full md:w-auto">
                       <div className="relative flex-1 md:w-64">
                         <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                         <Input
                           placeholder="Search projects..."
-                          className="pl-8"
+                          className="bg-white/90 pl-8"
                           value={searchTerm}
                           onChange={(e) => setSearchTerm(e.target.value)}
                         />
                       </div>
-                      <Button variant="outline" size="icon" className="border-[#0c2461] text-[#0c2461]">
+                      <Button variant="outline" size="icon" className="border-blue-200 bg-white/80 text-blue-700 hover:bg-blue-50">
                         <Filter className="h-4 w-4" />
                       </Button>
                     </div>
@@ -209,23 +201,26 @@ export default function StudentDashboard() {
                       ))}
                     </div>
                   ) : filteredProjects.length === 0 ? (
-                    <Card>
+                    <Card className="dashboard-panel rounded-lg">
                       <CardContent className="flex flex-col items-center justify-center py-10">
                         <p className="text-muted-foreground mb-4">No projects found</p>
                       </CardContent>
                     </Card>
                   ) : (
                     <div className="grid gap-4">
-                      {filteredProjects.map((project) => (
-                        <Card key={project.id} className="border-l-4 border-l-[#0c2461]">
+                      {filteredProjects.map((project) => {
+                        const existingApplication = getApplicationForProject(project.id)
+
+                        return (
+                        <Card key={project.id} className="dashboard-panel dashboard-lift rounded-lg border-l-4 border-l-blue-600">
                           <CardHeader>
                             <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
                               <div>
-                                <CardTitle className="text-[#0c2461]">{project.title}</CardTitle>
+                                <CardTitle className="text-slate-950">{project.title}</CardTitle>
                                 <div className="flex items-center gap-2 mt-2">
                                   <Avatar className="h-6 w-6">
                                     <AvatarImage
-                                      src={project.faculty_avatar || "/placeholder.svg?height=24&width=24"}
+                                      src={project.faculty_avatar || ""}
                                       alt={project.faculty_name}
                                     />
                                     <AvatarFallback className="bg-[#e1b12c] text-[#0c2461]">
@@ -255,37 +250,46 @@ export default function StudentDashboard() {
                             <div className="flex flex-wrap gap-2">
                               {project.tags &&
                                 (typeof project.tags === 'string' ? project.tags.split(',') : project.tags || []).map((tag: string, i: number) => (
-                                  <Badge key={i} variant="secondary" className="bg-[#0c2461]/10 text-[#0c2461]">
+                                  <Badge key={i} variant="secondary" className="bg-blue-50 text-blue-700">
                                     {tag.trim()}
                                   </Badge>
                                 ))}
                             </div>
                           </CardContent>
                           <CardFooter className="flex justify-between">
-                            <Link href={`/projects/${project.id}`}>
-                              <Button variant="outline" size="sm" className="text-[#0c2461] border-[#0c2461]">
+                            <Button asChild variant="outline" size="sm" className="border-blue-200 bg-white/80 text-blue-700 hover:bg-blue-50">
+                              <Link href={`/projects/${project.id}`}>
                                 View Details
+                              </Link>
+                            </Button>
+                            {existingApplication ? (
+                              <Button asChild variant="outline" size="sm" className="border-green-200 bg-green-50 text-green-700 hover:bg-green-100">
+                                <Link href="/dashboard/student/applications">
+                                  {existingApplication.status === "pending" ? "Applied" : `Applied: ${existingApplication.status}`}
+                                </Link>
                               </Button>
-                            </Link>
-                            <Link href={`/projects/${project.id}/apply`}>
-                              <Button size="sm" className="bg-[#0c2461] hover:bg-[#1e3799]">
-                                Apply Now
+                            ) : (
+                              <Button asChild size="sm" className="bg-[#0c2461] hover:bg-[#1e3799]">
+                                <Link href={`/projects/${project.id}/apply`}>
+                                  Apply Now
+                                </Link>
                               </Button>
-                            </Link>
+                            )}
                           </CardFooter>
                         </Card>
-                      ))}
+                        )
+                      })}
                     </div>
                   )}
                 </TabsContent>
                 <TabsContent value="applications" className="space-y-4">
                   <div className="flex justify-between items-center">
-                    <h2 className="text-xl font-semibold text-[#0c2461]">Your Applications</h2>
+                    <h2 className="text-xl font-semibold text-slate-950">Your Applications</h2>
                     <div className="relative w-64">
                       <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                       <Input
                         placeholder="Search applications..."
-                        className="pl-8"
+                        className="bg-white/90 pl-8"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                       />
@@ -308,7 +312,7 @@ export default function StudentDashboard() {
                       ))}
                     </div>
                   ) : filteredApplications.length === 0 ? (
-                    <Card>
+                    <Card className="dashboard-panel rounded-lg">
                       <CardContent className="flex flex-col items-center justify-center py-10">
                         <p className="text-muted-foreground mb-4">No applications found</p>
                       </CardContent>
@@ -318,7 +322,7 @@ export default function StudentDashboard() {
                       {filteredApplications.slice(0, 3).map((application) => (
                         <Card
                           key={application.id}
-                          className={`border-l-4 ${
+                          className={`dashboard-panel dashboard-lift rounded-lg border-l-4 ${
                             application.status === "approved"
                               ? "border-l-green-500"
                               : application.status === "rejected"
@@ -328,9 +332,20 @@ export default function StudentDashboard() {
                         >
                           <CardHeader>
                             <div className="flex justify-between items-start">
-                              <div>
-                                <CardTitle className="text-[#0c2461]">{application.project_title}</CardTitle>
-                                <CardDescription className="mt-1">Faculty: {application.faculty_name}</CardDescription>
+                              <div className="flex items-start gap-3">
+                                <Avatar className="h-10 w-10">
+                                  <AvatarImage src={application.faculty_avatar || ""} alt={application.faculty_name} />
+                                  <AvatarFallback>
+                                    {application.faculty_name
+                                      .split(" ")
+                                      .map((name: string) => name[0])
+                                      .join("")}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <div>
+                                  <CardTitle className="text-slate-950">{application.project_title}</CardTitle>
+                                  <CardDescription className="mt-1">Faculty: {application.faculty_name}</CardDescription>
+                                </div>
                               </div>
                               <Badge className={getStatusBadgeVariant(application.status)}>
                                 {application.status.charAt(0).toUpperCase() + application.status.slice(1)}
@@ -353,20 +368,20 @@ export default function StudentDashboard() {
                             )}
                           </CardContent>
                           <CardFooter>
-                            <Link href={`/projects/${application.project_id}`}>
-                              <Button variant="outline" size="sm" className="text-[#0c2461] border-[#0c2461]">
+                            <Button asChild variant="outline" size="sm" className="border-blue-200 bg-white/80 text-blue-700 hover:bg-blue-50">
+                              <Link href={`/projects/${application.project_id}`}>
                                 View Project
-                              </Button>
-                            </Link>
+                              </Link>
+                            </Button>
                           </CardFooter>
                         </Card>
                       ))}
                       <div className="flex justify-center mt-4">
-                        <Link href="/dashboard/student/applications">
-                          <Button variant="outline" className="text-[#0c2461] border-[#0c2461]">
+                        <Button asChild variant="outline" className="border-blue-200 bg-white/80 text-blue-700 hover:bg-blue-50">
+                          <Link href="/dashboard/student/applications">
                             View All Applications
-                          </Button>
-                        </Link>
+                          </Link>
+                        </Button>
                       </div>
                     </div>
                   )}

@@ -6,8 +6,8 @@ import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Bell, Menu } from "lucide-react"
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
-import { useState } from "react"
+import { Sheet, SheetContent, SheetDescription, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
+import { useEffect, useState } from "react"
 import { usePathname } from "next/navigation"
 import { 
   DropdownMenu, 
@@ -19,11 +19,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { 
   User, 
-  Settings, 
   LogOut, 
-  BookOpen, 
-  Users, 
-  TrendingUp,
   Shield
 } from "lucide-react"
 import { useRouter } from "next/navigation"
@@ -35,13 +31,66 @@ interface FacultyDashboardHeaderProps {
     last_name: string
     email: string
     role: string
+    profile_picture_url?: string | null
+    profilePictureUrl?: string | null
   }
 }
 
 const FacultyDashboardHeader = React.memo(({ user }: FacultyDashboardHeaderProps) => {
   const [open, setOpen] = useState(false)
+  const [currentUser, setCurrentUser] = useState(user)
   const pathname = usePathname()
   const router = useRouter()
+  const displayUser = currentUser || user
+  const profileImageUrl = displayUser?.profile_picture_url || displayUser?.profilePictureUrl || ""
+  const fallbackInitials = `${displayUser?.first_name?.charAt(0) || ""}${displayUser?.last_name?.charAt(0) || ""}` || "U"
+
+  useEffect(() => {
+    setCurrentUser(user)
+  }, [user])
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function loadCurrentUser() {
+      if (user) {
+        return
+      }
+
+      try {
+        const res = await fetch("/api/auth/me", { cache: "no-store" })
+        const result = await res.json()
+        const nextUser = result?.data?.user
+
+        if (!cancelled && res.ok && result.success && nextUser) {
+          setCurrentUser({
+            id: nextUser.id,
+            first_name: nextUser.firstName,
+            last_name: nextUser.lastName,
+            email: nextUser.email,
+            role: nextUser.role,
+            profile_picture_url: nextUser.profilePictureUrl || null,
+          })
+        }
+      } catch (error) {
+        console.error("Failed to load header user:", error)
+      }
+    }
+
+    loadCurrentUser()
+
+    const handleProfilePictureUpdated = (event: Event) => {
+      const profilePictureUrl = (event as CustomEvent<string>).detail
+      setCurrentUser((prev) => prev ? { ...prev, profile_picture_url: profilePictureUrl } : prev)
+    }
+
+    window.addEventListener("profile-picture-updated", handleProfilePictureUpdated)
+
+    return () => {
+      cancelled = true
+      window.removeEventListener("profile-picture-updated", handleProfilePictureUpdated)
+    }
+  }, [user])
 
   const isActive = (path: string) => {
     return pathname === path || pathname?.startsWith(`${path}/`)
@@ -65,59 +114,63 @@ const FacultyDashboardHeader = React.memo(({ user }: FacultyDashboardHeaderProps
   }
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b bg-gradient-to-r from-primary-600 to-accent-600 text-white">
-      <div className="container flex h-16 items-center">
+    <header className="sticky top-0 z-50 w-full border-b border-white/20 bg-slate-950/90 text-white shadow-[0_18px_45px_rgba(15,23,42,0.22)] backdrop-blur-xl">
+      <div className="container flex h-16 min-w-0 items-center">
         <Sheet open={open} onOpenChange={setOpen}>
           <SheetTrigger asChild>
-            <Button variant="ghost" size="icon" className="md:hidden text-white">
+            <Button variant="ghost" size="icon" className="mr-2 shrink-0 text-white hover:bg-white/10 hover:text-white md:hidden">
               <Menu className="h-5 w-5" />
               <span className="sr-only">Toggle menu</span>
             </Button>
           </SheetTrigger>
-          <SheetContent side="left" className="w-[240px] sm:w-[300px]">
+          <SheetContent side="left" className="w-[260px] sm:w-[300px]">
+            <SheetTitle className="sr-only">Faculty navigation</SheetTitle>
+            <SheetDescription className="sr-only">Main faculty dashboard navigation menu</SheetDescription>
             <div className="flex items-center gap-2 font-bold text-xl mb-8">
-              <Image src="/muj.png" alt="Manipal University Jaipur Logo" width={40} height={40} />
-              <span className="bg-clip-text text-transparent bg-gradient-to-r from-primary-500 to-accent-500">
+              <Image src="/muj.png" alt="Manipal University Jaipur Logo" width={34} height={34} className="h-8 w-auto shrink-0" />
+              <span className="bg-clip-text text-transparent bg-gradient-to-r from-blue-600 via-teal-500 to-amber-500">
                 Research Portal
               </span>
             </div>
-            <nav className="flex flex-col gap-4">
-              <Link href="/dashboard/faculty" className="text-lg font-medium" onClick={() => setOpen(false)}>
+            <nav className="flex flex-col gap-3">
+              <Link href="/dashboard/faculty" className="rounded-md px-3 py-2 text-base font-medium hover:bg-slate-100" onClick={() => setOpen(false)}>
                 Dashboard
               </Link>
-              <Link href="/dashboard/faculty/projects" className="text-lg font-medium" onClick={() => setOpen(false)}>
+              <Link href="/dashboard/faculty/projects" className="rounded-md px-3 py-2 text-base font-medium hover:bg-slate-100" onClick={() => setOpen(false)}>
                 Projects
               </Link>
               <Link
                 href="/dashboard/faculty/applications"
-                className="text-lg font-medium"
+                className="rounded-md px-3 py-2 text-base font-medium hover:bg-slate-100"
                 onClick={() => setOpen(false)}
               >
                 Applications
               </Link>
-              <Link href="/dashboard/faculty/analytics" className="text-lg font-medium" onClick={() => setOpen(false)}>
+              <Link href="/dashboard/faculty/analytics" className="rounded-md px-3 py-2 text-base font-medium hover:bg-slate-100" onClick={() => setOpen(false)}>
                 Analytics
               </Link>
-              <Link href="/dashboard/faculty/security" className="text-lg font-medium" onClick={() => setOpen(false)}>
+              <Link href="/dashboard/faculty/security" className="rounded-md px-3 py-2 text-base font-medium hover:bg-slate-100" onClick={() => setOpen(false)}>
                 Security
               </Link>
-              <Link href="/dashboard/faculty/profile" className="text-lg font-medium" onClick={() => setOpen(false)}>
+              <Link href="/dashboard/faculty/profile" className="rounded-md px-3 py-2 text-base font-medium hover:bg-slate-100" onClick={() => setOpen(false)}>
                 Profile
               </Link>
-              <Link href="/dashboard/faculty/settings" className="text-lg font-medium" onClick={() => setOpen(false)}>
+              <Link href="/dashboard/faculty/settings" className="rounded-md px-3 py-2 text-base font-medium hover:bg-slate-100" onClick={() => setOpen(false)}>
                 Settings
               </Link>
-              <Link href="/logout" className="text-lg font-medium text-red-400" onClick={() => setOpen(false)}>
+              <Link href="/logout" className="rounded-md px-3 py-2 text-base font-medium text-red-500 hover:bg-red-50" onClick={() => setOpen(false)}>
                 Logout
               </Link>
             </nav>
           </SheetContent>
         </Sheet>
-        <Link href="/" className="flex items-center gap-2 font-bold text-xl mr-8">
-          <Image src="/muj.png" alt="Manipal University Jaipur Logo" width={30} height={30} />
-          <span className="text-white">Manipal University Jaipur</span>
+        <Link href="/" className="mr-3 flex min-w-0 shrink items-center gap-2 font-bold lg:mr-5">
+          <Image src="/muj.png" alt="Manipal University Jaipur Logo" width={28} height={28} className="h-7 w-auto shrink-0" />
+          <span className="hidden max-w-[170px] truncate text-sm font-semibold text-white lg:inline xl:max-w-[240px]">
+            MUJ Research Portal
+          </span>
         </Link>
-        <nav className="hidden md:flex items-center gap-6 text-sm font-medium flex-1">
+        <nav className="hidden min-w-0 flex-1 items-center gap-1 text-sm font-medium md:flex lg:gap-2">
           <Link
             href="/dashboard/faculty"
             className={
@@ -125,9 +178,11 @@ const FacultyDashboardHeader = React.memo(({ user }: FacultyDashboardHeaderProps
               !isActive("/dashboard/faculty/projects") &&
               !isActive("/dashboard/faculty/applications") &&
               !isActive("/dashboard/faculty/analytics") &&
-              !isActive("/dashboard/faculty/security")
-                ? "font-bold text-white"
-                : "text-white/80 hover:text-white transition-colors"
+              !isActive("/dashboard/faculty/security") &&
+              !isActive("/dashboard/faculty/profile") &&
+              !isActive("/dashboard/faculty/settings")
+                ? "rounded-md bg-white/20 px-2 py-2 font-semibold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.22)] lg:px-3"
+                : "rounded-md px-2 py-2 text-white/80 transition-colors hover:bg-white/10 hover:text-white lg:px-3"
             }
           >
             Dashboard
@@ -136,8 +191,8 @@ const FacultyDashboardHeader = React.memo(({ user }: FacultyDashboardHeaderProps
             href="/dashboard/faculty/projects"
             className={
               isActive("/dashboard/faculty/projects")
-                ? "font-bold text-white"
-                : "text-white/80 hover:text-white transition-colors"
+                ? "rounded-md bg-white/20 px-2 py-2 font-semibold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.22)] lg:px-3"
+                : "rounded-md px-2 py-2 text-white/80 transition-colors hover:bg-white/10 hover:text-white lg:px-3"
             }
           >
             Projects
@@ -146,8 +201,8 @@ const FacultyDashboardHeader = React.memo(({ user }: FacultyDashboardHeaderProps
             href="/dashboard/faculty/applications"
             className={
               isActive("/dashboard/faculty/applications")
-                ? "font-bold text-white"
-                : "text-white/80 hover:text-white transition-colors"
+                ? "rounded-md bg-white/20 px-2 py-2 font-semibold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.22)] lg:px-3"
+                : "rounded-md px-2 py-2 text-white/80 transition-colors hover:bg-white/10 hover:text-white lg:px-3"
             }
           >
             Applications
@@ -156,8 +211,8 @@ const FacultyDashboardHeader = React.memo(({ user }: FacultyDashboardHeaderProps
             href="/dashboard/faculty/analytics"
             className={
               isActive("/dashboard/faculty/analytics")
-                ? "font-bold text-white"
-                : "text-white/80 hover:text-white transition-colors"
+                ? "rounded-md bg-white/20 px-2 py-2 font-semibold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.22)] lg:px-3"
+                : "rounded-md px-2 py-2 text-white/80 transition-colors hover:bg-white/10 hover:text-white lg:px-3"
             }
           >
             Analytics
@@ -166,8 +221,8 @@ const FacultyDashboardHeader = React.memo(({ user }: FacultyDashboardHeaderProps
             href="/dashboard/faculty/security"
             className={
               isActive("/dashboard/faculty/security")
-                ? "font-bold text-white"
-                : "text-white/80 hover:text-white transition-colors"
+                ? "rounded-md bg-white/20 px-2 py-2 font-semibold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.22)] lg:px-3"
+                : "rounded-md px-2 py-2 text-white/80 transition-colors hover:bg-white/10 hover:text-white lg:px-3"
             }
           >
             Security
@@ -176,26 +231,26 @@ const FacultyDashboardHeader = React.memo(({ user }: FacultyDashboardHeaderProps
             href="/dashboard/faculty/profile"
             className={
               isActive("/dashboard/faculty/profile")
-                ? "font-bold text-white"
-                : "text-white/80 hover:text-white transition-colors"
+                ? "rounded-md bg-white/20 px-2 py-2 font-semibold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.22)] lg:px-3"
+                : "rounded-md px-2 py-2 text-white/80 transition-colors hover:bg-white/10 hover:text-white lg:px-3"
             }
           >
             Profile
           </Link>
         </nav>
         <div className="flex items-center gap-4 ml-auto">
-          <Button variant="ghost" size="icon" className="relative text-white">
+          <Button variant="ghost" size="icon" className="relative text-white hover:bg-white/10 hover:text-white">
             <Bell className="h-5 w-5" />
-            <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-secondary-500 animate-pulse"></span>
+            <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-amber-400 animate-pulse"></span>
             <span className="sr-only">Notifications</span>
           </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="relative h-8 w-8 rounded-full">
-                <Avatar className="h-8 w-8">
-                  <AvatarImage src="/placeholder-user.jpg" alt={user?.first_name} />
+              <Button variant="ghost" className="relative h-9 w-9 rounded-full hover:bg-white/10">
+                <Avatar className="h-9 w-9 border border-white/30 shadow-md">
+                  <AvatarImage src={profileImageUrl} alt={displayUser?.first_name || "User"} />
                   <AvatarFallback>
-                    {user?.first_name?.charAt(0)}{user?.last_name?.charAt(0)}
+                    {fallbackInitials}
             </AvatarFallback>
           </Avatar>
               </Button>
@@ -204,10 +259,10 @@ const FacultyDashboardHeader = React.memo(({ user }: FacultyDashboardHeaderProps
               <DropdownMenuLabel className="font-normal">
                 <div className="flex flex-col space-y-1">
                   <p className="text-sm font-medium leading-none">
-                    {user?.first_name} {user?.last_name}
+                    {displayUser?.first_name} {displayUser?.last_name}
                   </p>
                   <p className="text-xs leading-none text-muted-foreground">
-                    {user?.email}
+                    {displayUser?.email}
                   </p>
                 </div>
               </DropdownMenuLabel>

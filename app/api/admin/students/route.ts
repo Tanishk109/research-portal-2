@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { connectToMongoDB } from "@/lib/mongodb";
-import { User, StudentProfile } from "@/lib/models";
-import { toPlainObject } from "@/lib/db";
+import { User } from "@/lib/models";
 
 export async function GET() {
   try {

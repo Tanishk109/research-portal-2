@@ -1,11 +1,11 @@
 "use server"
 
 import { connectToMongoDB } from "@/lib/mongodb"
-import { Application, Project, User, FacultyProfile, StudentProfile } from "@/lib/models"
+import { Application, Project, FacultyProfile, StudentProfile } from "@/lib/models"
 import { getCurrentUser } from "./auth"
 import { revalidatePath } from "next/cache"
 import { cache } from "@/lib/cache"
-import { toObjectId, toPlainObject } from "@/lib/db"
+import { toObjectId } from "@/lib/db"
 
 // Types
 export type ApplicationFormData = {
@@ -77,13 +77,23 @@ export async function applyToProject(data: ApplicationFormData) {
       status: "pending",
     })
 
+    cache.deleteByPrefix(`student-applications-v3-${user.id}-`)
+    cache.deleteByPrefix("faculty-applications-v3-")
+    cache.deleteByPrefix("faculty-projects-")
+
     revalidatePath("/dashboard/student")
     revalidatePath("/dashboard/student/applications")
+    revalidatePath("/dashboard/faculty")
+    revalidatePath("/dashboard/faculty/applications")
+    revalidatePath("/dashboard/faculty/projects")
     revalidatePath(`/projects/${data.projectId}`)
 
     return { success: true }
   } catch (error) {
     console.error("Apply to project error:", error)
+    if (typeof error === "object" && error !== null && "code" in error && (error as { code?: number }).code === 11000) {
+      return { success: false, message: "You have already applied to this project" }
+    }
     return { success: false, message: "An error occurred while applying to the project" }
   }
 }
@@ -105,7 +115,7 @@ export async function getStudentApplications(limit = 10, offset = 0) {
     }
 
     // Use cache per student user
-    const cacheKey = `student-applications-${user.id}-${safeLimit}-${safeOffset}`
+    const cacheKey = `student-applications-v3-${user.id}-${safeLimit}-${safeOffset}`
     const cached = cache.get<any[]>(cacheKey)
     if (cached) return cached
 
@@ -146,16 +156,25 @@ export async function getStudentApplications(limit = 10, offset = 0) {
       { $unwind: "$facultyUser" },
       {
         $project: {
+          _id: 0,
           id: { $toString: "$_id" },
           status: {
             $cond: [{ $eq: ["$status", "accepted"] }, "approved", "$status"],
           },
           message: "$cover_letter",
           feedback: { $ifNull: ["$feedback", null] },
-          applied_at: "$applied_at",
+          applied_at: {
+            $dateToString: {
+              date: "$applied_at",
+              format: "%Y-%m-%dT%H:%M:%S.%LZ",
+              timezone: "UTC",
+              onNull: null,
+            },
+          },
           project_id: { $toString: "$project._id" },
           project_title: "$project.title",
           faculty_name: { $concat: ["$facultyUser.first_name", " ", "$facultyUser.last_name"] },
+          faculty_avatar: { $ifNull: ["$facultyUser.profile_picture_url", null] },
         },
       },
       { $sort: { applied_at: -1 } },
@@ -188,7 +207,7 @@ export async function getFacultyApplications(limit = 10, offset = 0) {
     }
 
     // Use cache per faculty user
-    const cacheKey = `faculty-applications-${user.id}-${safeLimit}-${safeOffset}`
+    const cacheKey = `faculty-applications-v3-${user.id}-${safeLimit}-${safeOffset}`
     const cached = cache.get<any[]>(cacheKey)
     if (cached) return cached
 
@@ -235,17 +254,26 @@ export async function getFacultyApplications(limit = 10, offset = 0) {
       { $unwind: "$studentUser" },
       {
         $project: {
+          _id: 0,
           id: { $toString: "$_id" },
           status: {
             $cond: [{ $eq: ["$status", "accepted"] }, "approved", "$status"],
           },
           message: "$cover_letter",
           feedback: { $ifNull: ["$feedback", null] },
-          applied_at: "$applied_at",
+          applied_at: {
+            $dateToString: {
+              date: "$applied_at",
+              format: "%Y-%m-%dT%H:%M:%S.%LZ",
+              timezone: "UTC",
+              onNull: null,
+            },
+          },
           project_id: { $toString: "$project._id" },
           project_title: "$project.title",
           student_id: { $toString: "$studentProfile._id" },
           student_name: { $concat: ["$studentUser.first_name", " ", "$studentUser.last_name"] },
+          student_avatar: { $ifNull: ["$studentUser.profile_picture_url", null] },
           registration_number: "$studentProfile.registration_number",
           year: "$studentProfile.year",
           cgpa: "$studentProfile.cgpa",
@@ -311,6 +339,11 @@ export async function updateApplicationStatus(
       return { success: false, message: "Application not found or you don't have permission to update it" }
     }
 
+    if (application.status !== "pending") {
+      const currentStatus = application.status === "accepted" ? "approved" : application.status
+      return { success: false, message: `This application has already been ${currentStatus}` }
+    }
+
     // Update application status
     const updateData: any = {
       status,
@@ -323,6 +356,10 @@ export async function updateApplicationStatus(
     }
 
     await Application.findByIdAndUpdate(applicationId, updateData)
+
+    cache.deleteByPrefix("student-applications-v3-")
+    cache.deleteByPrefix("faculty-applications-v3-")
+    cache.deleteByPrefix("faculty-projects-")
 
     revalidatePath("/dashboard/faculty")
     revalidatePath("/dashboard/faculty/applications")
@@ -399,15 +436,39 @@ export async function getFacultyApplicationById(id: number | string) {
       },
       { $unwind: "$studentUser" },
       {
+        $lookup: {
+          from: "studentcvs",
+          localField: "student_id",
+          foreignField: "user_id",
+          as: "studentCV",
+        },
+      },
+      { $unwind: { path: "$studentCV", preserveNullAndEmptyArrays: true } },
+      {
         $project: {
+          _id: 0,
           id: { $toString: "$_id" },
           status: {
             $cond: [{ $eq: ["$status", "accepted"] }, "approved", "$status"],
           },
           cover_letter: "$cover_letter",
           feedback: { $ifNull: ["$feedback", null] },
-          applied_at: "$applied_at",
-          reviewed_at: "$reviewed_at",
+          applied_at: {
+            $dateToString: {
+              date: "$applied_at",
+              format: "%Y-%m-%dT%H:%M:%S.%LZ",
+              timezone: "UTC",
+              onNull: null,
+            },
+          },
+          reviewed_at: {
+            $dateToString: {
+              date: "$reviewed_at",
+              format: "%Y-%m-%dT%H:%M:%S.%LZ",
+              timezone: "UTC",
+              onNull: null,
+            },
+          },
           project: {
             id: { $toString: "$project._id" },
             title: "$project.title",
@@ -417,10 +478,37 @@ export async function getFacultyApplicationById(id: number | string) {
             id: { $toString: "$studentUser._id" },
             name: { $concat: ["$studentUser.first_name", " ", "$studentUser.last_name"] },
             email: "$studentUser.email",
+            avatar: { $ifNull: ["$studentUser.profile_picture_url", null] },
             registration_number: "$studentProfile.registration_number",
             year: "$studentProfile.year",
             cgpa: "$studentProfile.cgpa",
             department: "$studentProfile.department",
+            resume: {
+              $cond: [
+                { $ifNull: ["$studentCV.file_url", false] },
+                {
+                  id: {
+                    $cond: [
+                      { $ifNull: ["$studentCV._id", false] },
+                      { $toString: "$studentCV._id" },
+                      null,
+                    ],
+                  },
+                  file_url: "$studentCV.file_url",
+                  file_name: { $ifNull: ["$studentCV.file_name", "Resume.pdf"] },
+                  mime_type: { $ifNull: ["$studentCV.mime_type", "application/pdf"] },
+                  uploaded_at: {
+                    $dateToString: {
+                      date: "$studentCV.uploaded_at",
+                      format: "%Y-%m-%dT%H:%M:%S.%LZ",
+                      timezone: "UTC",
+                      onNull: null,
+                    },
+                  },
+                },
+                null,
+              ],
+            },
           },
         },
       },

@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { AlertCircle, Boxes, CheckCircle, Database, FileText, RefreshCw, Users, XCircle } from "lucide-react"
+import { AlertCircle, Boxes, CheckCircle, Database, RefreshCw, Users, XCircle } from "lucide-react"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"

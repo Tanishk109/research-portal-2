@@ -27,6 +27,7 @@ export default async function FacultyDirectory() {
           first_name: 1,
           last_name: 1,
           email: 1,
+          profile_picture_url: 1,
           department: "$profile.department",
           specialization: "$profile.specialization",
         },

@@ -4,9 +4,9 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card"
 
 export default function Loading() {
   return (
-    <div className="flex min-h-screen flex-col bg-gray-50">
+    <div className="flex min-h-screen flex-col dashboard-shell">
       <StudentDashboardHeader />
-      <main className="flex-1 p-6 md:p-10">
+      <main className="flex-1 px-4 py-8 md:px-6">
         <div className="grid gap-6">
           <div>
             <Skeleton className="h-10 w-[250px] mb-2" />

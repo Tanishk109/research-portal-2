@@ -2,10 +2,8 @@
 
 import type React from "react"
 import dynamic from "next/dynamic"
-import useSWR from "swr"
-import Image from "next/image"
 
-import { useState, useEffect } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -14,16 +12,15 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
-import { Upload, X, Plus, FileText, Award, Save } from "lucide-react"
+import { Upload, X, Plus, FileText, Award } from "lucide-react"
 import { Progress } from "@/components/ui/progress"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import type { StudentProfileData } from "@/app/actions/profiles"
-import { useToast } from "@/hooks/use-toast"
+import { useToast } from "@/components/ui/use-toast"
 
 const StudentDashboardHeader = dynamic(() => import("@/components/student-dashboard-header"), { ssr: false })
-
-const fetcher = (url: string) => fetch(url).then(res => res.json())
 const MAX_UPLOAD_BYTES = 5 * 1024 * 1024
+const MAX_PROFILE_IMAGE_BYTES = 2 * 1024 * 1024
 
 function readFileAsDataUrl(file: File) {
   return new Promise<string>((resolve, reject) => {
@@ -34,6 +31,19 @@ function readFileAsDataUrl(file: File) {
   })
 }
 
+function dataUrlToBlobUrl(dataUrl: string) {
+  const [metadata, base64Data] = dataUrl.split(",")
+  const mimeType = metadata.match(/^data:([^;]+);base64$/)?.[1] || "application/octet-stream"
+  const binary = atob(base64Data || "")
+  const bytes = new Uint8Array(binary.length)
+
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index)
+  }
+
+  return URL.createObjectURL(new Blob([bytes], { type: mimeType }))
+}
+
 export default function StudentProfilePage() {
   const { toast } = useToast()
   const [loading, setLoading] = useState(true)
@@ -42,6 +52,7 @@ export default function StudentProfilePage() {
     firstName: "",
     lastName: "",
     email: "",
+    profilePictureUrl: "",
     registrationNumber: "",
     department: "",
     year: "",
@@ -49,56 +60,82 @@ export default function StudentProfilePage() {
     phone: "",
     bio: ""
   })
-  const [profileCompletion, setProfileCompletion] = useState(65)
-  const [uploadedCV, setUploadedCV] = useState<File | null>(null)
-  const [cvData, setCvData] = useState<{ file_url?: string; uploaded_at?: string } | null>(null)
+  const [cvData, setCvData] = useState<{ file_url?: string; file_name?: string; mime_type?: string; uploaded_at?: string } | null>(null)
   const [certificates, setCertificates] = useState<Array<{ id: string; name: string; file_url?: string; uploaded_at?: string }>>([])
   const [skills, setSkills] = useState<string[]>([])
   const [newSkill, setNewSkill] = useState("")
-  const [savingCV, setSavingCV] = useState(false)
   const [savingCertificates, setSavingCertificates] = useState(false)
   const [savingSkills, setSavingSkills] = useState(false)
+  const [savingPhoto, setSavingPhoto] = useState(false)
 
-  const { data, error, isLoading: swrLoading } = useSWR("/api/dashboard/student/profile", fetcher, { refreshInterval: 30000 })
+  const profileCompletion = useMemo(() => {
+    const requiredFields = [
+      profileData.firstName,
+      profileData.lastName,
+      profileData.email,
+      profileData.registrationNumber,
+      profileData.department,
+      profileData.year,
+      profileData.cgpa ? String(profileData.cgpa) : "",
+      profileData.phone,
+      profileData.bio,
+      profileData.profilePictureUrl,
+    ]
 
-  // Load profile data on component mount
-  useEffect(() => {
-    async function loadProfile() {
-      try {
-        const res = await fetch("/api/dashboard/student/profile")
-        const result = await res.json()
-        if (res.ok && result.success && result.profile) {
-          setProfileData({
-            firstName: result.profile.first_name || "",
-            lastName: result.profile.last_name || "",
-            email: result.profile.email || "",
-            registrationNumber: result.profile.registration_number || "",
-            department: result.profile.department || "",
-            year: result.profile.year || "",
-            cgpa: result.profile.cgpa || 0,
-            phone: result.profile.phone || "",
-            bio: result.profile.bio || ""
-          })
-        } else {
-          toast({
-            title: "Error",
-            description: result.message || "Failed to load profile",
-            variant: "destructive",
-          })
-        }
-      } catch (error) {
-        console.error("Error loading profile:", error)
+    const completedRequired = requiredFields.filter((value) => String(value || "").trim().length > 0).length
+    const baseScore = Math.round((completedRequired / requiredFields.length) * 70)
+    const resumeScore = cvData?.file_url ? 10 : 0
+    const certificateScore = certificates.length > 0 ? 10 : 0
+    const skillsScore = skills.length > 0 ? 10 : 0
+
+    return Math.min(100, baseScore + resumeScore + certificateScore + skillsScore)
+  }, [certificates.length, cvData?.file_url, profileData, skills.length])
+
+  const loadProfile = async (showLoading = false) => {
+    if (showLoading) {
+      setLoading(true)
+    }
+
+    try {
+      const res = await fetch("/api/dashboard/student/profile")
+      const result = await res.json()
+      if (res.ok && result.success && result.profile) {
+        setProfileData({
+          firstName: result.profile.first_name || "",
+          lastName: result.profile.last_name || "",
+          email: result.profile.email || "",
+          profilePictureUrl: result.profile.profile_picture_url || "",
+          registrationNumber: result.profile.registration_number || "",
+          department: result.profile.department || "",
+          year: result.profile.year || "",
+          cgpa: result.profile.cgpa || 0,
+          phone: result.profile.phone || "",
+          bio: result.profile.bio || ""
+        })
+      } else {
         toast({
           title: "Error",
-          description: "Failed to load profile data",
+          description: result.message || "Failed to load profile",
           variant: "destructive",
         })
-      } finally {
+      }
+    } catch (error) {
+      console.error("Error loading profile:", error)
+      toast({
+        title: "Error",
+        description: "Failed to load profile data",
+        variant: "destructive",
+      })
+    } finally {
+      if (showLoading) {
         setLoading(false)
       }
     }
+  }
 
-    loadProfile()
+  // Load profile data on component mount
+  useEffect(() => {
+    loadProfile(true)
     loadCV()
     loadCertificates()
     loadSkills()
@@ -110,12 +147,76 @@ export default function StudentProfilePage() {
       const res = await fetch("/api/dashboard/student/cv")
       const result = await res.json()
       if (res.ok && result.success) {
-        if (result.data) {
-          setCvData(result.data)
-        }
+        setCvData(result.data || null)
       }
     } catch (error) {
       console.error("Error loading CV:", error)
+    }
+  }
+
+  const handleProfilePictureUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const input = e.currentTarget
+    const file = input.files?.[0]
+
+    if (!file) {
+      return
+    }
+
+    if (!file.type.startsWith("image/")) {
+      toast({
+        title: "Invalid file",
+        description: "Please upload a PNG, JPG, or WebP image.",
+        variant: "destructive",
+      })
+      input.value = ""
+      return
+    }
+
+    if (file.size > MAX_PROFILE_IMAGE_BYTES) {
+      toast({
+        title: "Image too large",
+        description: "Please upload a professional photo up to 2MB.",
+        variant: "destructive",
+      })
+      input.value = ""
+      return
+    }
+
+    setSavingPhoto(true)
+    try {
+      const profilePictureUrl = await readFileAsDataUrl(file)
+      const nextProfileData = { ...profileData, profilePictureUrl }
+      const res = await fetch("/api/dashboard/student/profile", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(nextProfileData),
+      })
+      const result = await res.json()
+
+      if (res.ok && result.success) {
+        setProfileData(nextProfileData)
+        window.dispatchEvent(new CustomEvent("profile-picture-updated", { detail: profilePictureUrl }))
+        toast({
+          title: "Success",
+          description: "Profile photo uploaded successfully",
+        })
+      } else {
+        toast({
+          title: "Error",
+          description: result.message || "Failed to upload profile photo",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("Error uploading profile photo:", error)
+      toast({
+        title: "Error",
+        description: "Failed to upload profile photo",
+        variant: "destructive",
+      })
+    } finally {
+      setSavingPhoto(false)
+      input.value = ""
     }
   }
 
@@ -160,6 +261,7 @@ export default function StudentProfilePage() {
       })
       const result = await res.json()
       if (res.ok && result.success) {
+        await loadProfile()
         toast({
           title: "Success",
           description: "Profile updated successfully",
@@ -190,46 +292,57 @@ export default function StudentProfilePage() {
       if (file.size > MAX_UPLOAD_BYTES) {
         toast({
           title: "File too large",
-          description: "Please upload a CV up to 5MB.",
+          description: "Please upload a PDF resume up to 5MB.",
           variant: "destructive",
         })
         return
       }
 
-      setUploadedCV(file)
-      
-      setSavingCV(true)
+      if (file.type !== "application/pdf") {
+        toast({
+          title: "PDF required",
+          description: "Please upload your resume as a PDF file.",
+          variant: "destructive",
+        })
+        e.target.value = ""
+        return
+      }
+
       try {
         const fileUrl = await readFileAsDataUrl(file)
         const res = await fetch("/api/dashboard/student/cv", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ file_url: fileUrl }),
+          body: JSON.stringify({ file_url: fileUrl, file_name: file.name }),
         })
         const result = await res.json()
         if (res.ok && result.success) {
+          setCvData(result.data || {
+            file_url: fileUrl,
+            file_name: file.name,
+            mime_type: "application/pdf",
+            uploaded_at: new Date().toISOString(),
+          })
           toast({
             title: "Success",
-            description: "CV uploaded successfully",
+            description: "Resume uploaded successfully",
           })
-          await loadCV()
-          setProfileCompletion(Math.min(profileCompletion + 10, 100))
         } else {
           toast({
             title: "Error",
-            description: result.message || "Failed to upload CV",
+            description: result.message || "Failed to upload resume",
             variant: "destructive",
           })
         }
       } catch (error) {
-        console.error("Error uploading CV:", error)
+        console.error("Error uploading resume:", error)
         toast({
           title: "Error",
-          description: "Failed to upload CV",
+          description: "Failed to upload resume",
           variant: "destructive",
         })
       } finally {
-        setSavingCV(false)
+        e.target.value = ""
       }
     }
   }
@@ -264,7 +377,6 @@ export default function StudentProfilePage() {
             description: "Certificate uploaded successfully",
           })
           await loadCertificates()
-          setProfileCompletion(Math.min(profileCompletion + 5, 100))
         } else {
           toast({
             title: "Error",
@@ -295,7 +407,28 @@ export default function StudentProfilePage() {
       return
     }
 
-    window.open(fileUrl, "_blank", "noopener,noreferrer")
+    let viewUrl = fileUrl
+    try {
+      viewUrl = fileUrl.startsWith("data:") ? dataUrlToBlobUrl(fileUrl) : fileUrl
+    } catch (error) {
+      console.error("Error preparing file preview:", error)
+      toast({
+        title: "Unable to preview file",
+        description: "The stored file appears to be malformed. Please upload it again.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    const opened = window.open(viewUrl, "_blank", "noopener,noreferrer")
+
+    if (!opened) {
+      toast({
+        title: "Unable to open file",
+        description: "Please allow pop-ups for this site and try again.",
+        variant: "destructive",
+      })
+    }
   }
 
   const removeCV = async () => {
@@ -306,24 +439,23 @@ export default function StudentProfilePage() {
       const result = await res.json()
 
       if (res.ok && result.success) {
-        setUploadedCV(null)
         setCvData(null)
         toast({
           title: "Success",
-          description: "CV removed successfully",
+          description: "Resume removed successfully",
         })
       } else {
         toast({
           title: "Error",
-          description: result.message || "Failed to remove CV",
+          description: result.message || "Failed to remove resume",
           variant: "destructive",
         })
       }
     } catch (error) {
-      console.error("Error removing CV:", error)
+      console.error("Error removing resume:", error)
       toast({
         title: "Error",
-        description: "Failed to remove CV",
+        description: "Failed to remove resume",
         variant: "destructive",
       })
     }
@@ -341,7 +473,6 @@ export default function StudentProfilePage() {
           description: "Certificate removed successfully",
         })
         await loadCertificates()
-        setProfileCompletion(Math.max(profileCompletion - 5, 0))
       } else {
         toast({
           title: "Error",
@@ -363,13 +494,11 @@ export default function StudentProfilePage() {
     if (newSkill && !skills.includes(newSkill)) {
       setSkills([...skills, newSkill])
       setNewSkill("")
-      setProfileCompletion(Math.min(profileCompletion + 2, 100))
     }
   }
 
   const removeSkill = (skill: string) => {
     setSkills(skills.filter((s) => s !== skill))
-    setProfileCompletion(Math.max(profileCompletion - 2, 0))
   }
 
   const handleSaveSkills = async () => {
@@ -407,11 +536,11 @@ export default function StudentProfilePage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen flex-col bg-gray-50">
+      <div className="flex min-h-screen flex-col dashboard-shell">
         <StudentDashboardHeader />
-        <main className="flex-1 p-6 md:p-10">
-          <div className="max-w-4xl mx-auto">
-            <div className="flex items-center justify-center h-64">
+        <main className="flex-1 px-4 py-8 md:px-6">
+          <div className="mx-auto max-w-5xl">
+            <div className="dashboard-panel flex h-64 items-center justify-center rounded-lg">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
               <span className="ml-2">Loading profile...</span>
             </div>
@@ -422,64 +551,93 @@ export default function StudentProfilePage() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-gray-50">
+    <div className="flex min-h-screen flex-col dashboard-shell">
       <StudentDashboardHeader />
-      <main className="flex-1 p-6 md:p-10">
-        <div className="max-w-4xl mx-auto">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+      <main className="flex-1 px-4 py-8 md:px-6">
+        <div className="mx-auto max-w-5xl space-y-6">
+          <div className="dashboard-hero rounded-lg p-6 text-white md:p-8">
+            <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
             <div>
-              <h1 className="text-3xl font-bold tracking-tight text-primary">Student Profile</h1>
-              <p className="text-muted-foreground">Manage your personal information, CV, and certificates</p>
+                <p className="text-sm font-medium uppercase tracking-[0.24em] text-cyan-100">Student Profile</p>
+                <h1 className="mt-3 text-3xl font-semibold tracking-tight md:text-5xl">Academic Identity</h1>
+                <p className="mt-4 max-w-2xl text-sm leading-6 text-slate-100 md:text-base">
+                  Keep your profile, academic details, resume, certificates, and skills ready for faculty review.
+                </p>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="text-sm text-muted-foreground">Profile Completion</div>
-              <Progress value={profileCompletion} className="w-32 h-2" />
-              <span className="text-sm font-medium">{profileCompletion}%</span>
+              <div className="w-full rounded-lg border border-white/20 bg-white/10 p-4 backdrop-blur md:w-72">
+                <div className="mb-2 flex items-center justify-between">
+                  <span className="text-sm font-medium text-white">Profile Completion</span>
+                  <span className="text-sm font-semibold text-cyan-100">{profileCompletion}%</span>
+                </div>
+                <Progress value={profileCompletion} className="h-2" />
+              </div>
             </div>
           </div>
 
           <Tabs defaultValue="personal" className="space-y-6">
-            <TabsList className="bg-white border">
-              <TabsTrigger value="personal" className="data-[state=active]:bg-primary data-[state=active]:text-white">
+            <TabsList className="grid h-auto w-full grid-cols-2 gap-1 rounded-lg border border-slate-200 bg-white/90 p-1 shadow-sm md:grid-cols-4">
+              <TabsTrigger value="personal">
                 Personal Info
               </TabsTrigger>
-              <TabsTrigger value="cv" className="data-[state=active]:bg-primary data-[state=active]:text-white">
-                CV & Resume
+              <TabsTrigger value="cv">
+                Resume
               </TabsTrigger>
-              <TabsTrigger
-                value="certificates"
-                className="data-[state=active]:bg-primary data-[state=active]:text-white"
-              >
+              <TabsTrigger value="certificates">
                 Certificates
               </TabsTrigger>
-              <TabsTrigger value="skills" className="data-[state=active]:bg-primary data-[state=active]:text-white">
+              <TabsTrigger value="skills">
                 Skills
               </TabsTrigger>
             </TabsList>
 
             <TabsContent value="personal">
-              <Card>
+              <Card className="dashboard-panel-strong rounded-lg">
                 <CardHeader>
-                  <CardTitle>Personal Information</CardTitle>
+                  <CardTitle>Profile Information</CardTitle>
                   <CardDescription>Update your personal details and academic information</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                  <div className="flex flex-col md:flex-row gap-6 items-start">
-                    <div className="flex flex-col items-center gap-2">
-                      <Avatar className="h-24 w-24">
-                        <AvatarImage src="/placeholder.svg?height=96&width=96" alt="Alex Johnson" />
-                        <AvatarFallback className="bg-secondary text-white text-xl">AJ</AvatarFallback>
+                  <div className="rounded-lg border border-slate-200/80 bg-white/75 p-5 shadow-sm">
+                    <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+                      <Avatar className="h-24 w-24 border-4 border-white shadow-sm">
+                        <AvatarImage
+                          src={profileData.profilePictureUrl || "/placeholder.svg?height=96&width=96"}
+                          alt={`${profileData.firstName} ${profileData.lastName}`.trim() || "Student profile"}
+                        />
+                        <AvatarFallback className="bg-primary text-white text-xl">
+                          {`${profileData.firstName?.[0] || ""}${profileData.lastName?.[0] || ""}`.toUpperCase() || "ST"}
+                        </AvatarFallback>
                       </Avatar>
-                      <Button variant="outline" size="sm" className="mt-2">
-                        Change Photo
-                      </Button>
+                      <div className="space-y-2">
+                        <div>
+                          <p className="text-sm font-medium text-slate-900">Professional Picture</p>
+                          <p className="text-sm text-muted-foreground">Use a clear, professional photo for your profile.</p>
+                        </div>
+                        <input
+                          id="student-profile-photo"
+                          type="file"
+                          accept="image/png,image/jpeg,image/webp"
+                          className="sr-only"
+                          onChange={handleProfilePictureUpload}
+                          disabled={savingPhoto || loading}
+                        />
+                        <Button variant="outline" size="sm" asChild>
+                          <Label htmlFor="student-profile-photo" className="cursor-pointer">
+                            <Upload className="mr-2 h-4 w-4" />
+                            {savingPhoto ? "Uploading..." : "Upload Photo"}
+                          </Label>
+                        </Button>
+                      </div>
                     </div>
-                    <div className="flex-1 grid gap-4">
+                  </div>
+
+                  <div className="grid gap-4">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-2">
                           <Label htmlFor="first-name">First Name</Label>
                             <Input 
                               id="first-name" 
+                              className="bg-white/90"
                               value={profileData.firstName}
                               onChange={(e) => setProfileData({...profileData, firstName: e.target.value})}
                               disabled={loading}
@@ -489,6 +647,7 @@ export default function StudentProfilePage() {
                             <Label htmlFor="last-name">Last Name</Label>
                             <Input 
                               id="last-name" 
+                              className="bg-white/90"
                               value={profileData.lastName}
                               onChange={(e) => setProfileData({...profileData, lastName: e.target.value})}
                               disabled={loading}
@@ -500,6 +659,7 @@ export default function StudentProfilePage() {
                           <Input 
                             id="email" 
                             type="email" 
+                            className="bg-white/90"
                             value={profileData.email}
                             onChange={(e) => setProfileData({...profileData, email: e.target.value})}
                             disabled={loading}
@@ -509,19 +669,19 @@ export default function StudentProfilePage() {
                         <Label htmlFor="reg-number">Registration Number</Label>
                           <Input 
                             id="reg-number" 
+                            className="bg-white/90"
                             value={profileData.registrationNumber}
                             onChange={(e) => setProfileData({...profileData, registrationNumber: e.target.value})}
                             disabled={loading}
                           />
                       </div>
                     </div>
-                  </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="department">Department</Label>
                       <Select value={profileData.department} onValueChange={(value) => setProfileData({...profileData, department: value})} disabled={loading}>
-                        <SelectTrigger id="department">
+                        <SelectTrigger id="department" className="bg-white/90">
                           <SelectValue placeholder="Select department" />
                         </SelectTrigger>
                         <SelectContent>
@@ -536,7 +696,7 @@ export default function StudentProfilePage() {
                     <div className="space-y-2">
                       <Label htmlFor="year">Current Year</Label>
                       <Select value={profileData.year} onValueChange={(value) => setProfileData({...profileData, year: value})} disabled={loading}>
-                        <SelectTrigger id="year">
+                        <SelectTrigger id="year" className="bg-white/90">
                           <SelectValue placeholder="Select year" />
                         </SelectTrigger>
                         <SelectContent>
@@ -556,6 +716,7 @@ export default function StudentProfilePage() {
                       <Input 
                         id="cgpa" 
                         type="number" 
+                        className="bg-white/90"
                         step="0.01" 
                         min="0" 
                         max="10" 
@@ -569,6 +730,7 @@ export default function StudentProfilePage() {
                       <Input 
                         id="phone" 
                         type="tel" 
+                        className="bg-white/90"
                         value={profileData.phone}
                         onChange={(e) => setProfileData({...profileData, phone: e.target.value})}
                         disabled={loading}
@@ -581,7 +743,7 @@ export default function StudentProfilePage() {
                     <Textarea
                       id="bio"
                       placeholder="Write a short bio about yourself..."
-                      className="min-h-[100px]"
+                      className="min-h-[100px] bg-white/90"
                       value={profileData.bio}
                       onChange={(e) => setProfileData({...profileData, bio: e.target.value})}
                       disabled={loading}
@@ -597,20 +759,19 @@ export default function StudentProfilePage() {
             </TabsContent>
 
             <TabsContent value="cv">
-              <Card>
+              <Card className="dashboard-panel-strong rounded-lg">
                 <CardHeader>
-                  <CardTitle>CV & Resume</CardTitle>
-                  <CardDescription>Upload your CV or resume to share with faculty members</CardDescription>
+                  <CardTitle>Resume</CardTitle>
+                  <CardDescription>Upload a professional PDF resume to share with faculty members reviewing applications</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                  {(uploadedCV || cvData) ? (
-                    <div className="border rounded-lg p-4 flex items-center justify-between">
+                  {cvData ? (
+                    <div className="flex items-center justify-between rounded-lg border border-slate-200/80 bg-white/75 p-4">
                       <div className="flex items-center gap-3">
                         <FileText className="h-8 w-8 text-primary" />
                         <div>
-                          <p className="font-medium">{uploadedCV?.name || "Uploaded CV"}</p>
+                          <p className="font-medium">{cvData.file_name || "Uploaded Resume.pdf"}</p>
                           <p className="text-sm text-muted-foreground">
-                            {uploadedCV ? `${(uploadedCV.size / 1024 / 1024).toFixed(2)} MB • ` : ""}
                             Uploaded on{" "}
                             {cvData?.uploaded_at ? new Date(cvData.uploaded_at).toLocaleDateString() : new Date().toLocaleDateString()}
                           </p>
@@ -631,19 +792,19 @@ export default function StudentProfilePage() {
                       </div>
                     </div>
                   ) : (
-                    <div className="border border-dashed rounded-lg p-8 flex flex-col items-center justify-center text-center">
+                    <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-slate-300 bg-white/60 p-8 text-center">
                       <Upload className="h-10 w-10 text-muted-foreground mb-4" />
-                      <h3 className="font-medium text-lg mb-1">Upload your CV</h3>
+                      <h3 className="font-medium text-lg mb-1">Upload your resume</h3>
                       <p className="text-sm text-muted-foreground mb-4">
-                        Drag and drop your CV or resume file, or click to browse
+                        Drag and drop your PDF resume, or click to browse
                       </p>
-                      <p className="text-xs text-muted-foreground mb-6">PDF, DOCX or ODT up to 5MB</p>
+                      <p className="text-xs text-muted-foreground mb-6">PDF only, up to 5MB</p>
                       <div className="relative">
                         <Input
                           type="file"
                           id="cv-upload"
                           className="absolute inset-0 opacity-0 cursor-pointer"
-                          accept=".pdf,.docx,.odt"
+                          accept="application/pdf,.pdf"
                           onChange={handleCVUpload}
                         />
                         <Button variant="outline">Select File</Button>
@@ -652,33 +813,20 @@ export default function StudentProfilePage() {
                   )}
 
                   <div className="space-y-2">
-                    <Label htmlFor="cv-description">Description</Label>
+                    <Label htmlFor="cv-description">Resume Notes</Label>
                     <Textarea
                       id="cv-description"
-                      placeholder="Add a brief description of your CV..."
-                      className="min-h-[80px]"
-                      defaultValue="My CV highlights my academic achievements, technical skills, and relevant coursework in Computer Science with a focus on machine learning and data analysis."
+                      placeholder="Add a brief note about your resume..."
+                      className="min-h-[80px] bg-white/90"
+                      defaultValue="My resume highlights my academic achievements, technical skills, and relevant coursework in Computer Science with a focus on machine learning and data analysis."
                     />
                   </div>
                 </CardContent>
-                <CardFooter className="flex justify-end">
-                  <Button 
-                    className="bg-primary hover:bg-primary/90" 
-                    disabled={savingCV}
-                    onClick={async () => {
-                      if (uploadedCV) {
-                        await handleCVUpload({ target: { files: [uploadedCV] } } as any)
-                      }
-                    }}
-                  >
-                    {savingCV ? "Saving..." : "Save Changes"}
-                  </Button>
-                </CardFooter>
               </Card>
             </TabsContent>
 
             <TabsContent value="certificates">
-              <Card>
+              <Card className="dashboard-panel-strong rounded-lg">
                 <CardHeader>
                   <CardTitle>Certificates & Achievements</CardTitle>
                   <CardDescription>Upload certificates and showcase your achievements</CardDescription>
@@ -686,7 +834,7 @@ export default function StudentProfilePage() {
                 <CardContent className="space-y-6">
                   <div className="grid gap-4">
                     {certificates.map((cert) => (
-                      <div key={cert.id} className="border rounded-lg p-4 flex items-center justify-between">
+                      <div key={cert.id} className="flex items-center justify-between rounded-lg border border-slate-200/80 bg-white/75 p-4">
                         <div className="flex items-center gap-3">
                           <Award className="h-8 w-8 text-accent" />
                           <div>
@@ -714,7 +862,7 @@ export default function StudentProfilePage() {
                     ))}
                   </div>
 
-                  <div className="border border-dashed rounded-lg p-6 flex flex-col items-center justify-center text-center">
+                  <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-slate-300 bg-white/60 p-6 text-center">
                     <Award className="h-8 w-8 text-muted-foreground mb-3" />
                     <h3 className="font-medium mb-1">Add a new certificate</h3>
                     <p className="text-sm text-muted-foreground mb-4">
@@ -732,19 +880,11 @@ export default function StudentProfilePage() {
                     </div>
                   </div>
                 </CardContent>
-                <CardFooter className="flex justify-end">
-                  <Button 
-                    className="bg-primary hover:bg-primary/90"
-                    disabled={savingCertificates}
-                  >
-                    {savingCertificates ? "Saving..." : "Changes Saved Automatically"}
-                  </Button>
-                </CardFooter>
               </Card>
             </TabsContent>
 
             <TabsContent value="skills">
-              <Card>
+              <Card className="dashboard-panel-strong rounded-lg">
                 <CardHeader>
                   <CardTitle>Skills & Expertise</CardTitle>
                   <CardDescription>Add your technical and soft skills to highlight your expertise</CardDescription>
@@ -770,6 +910,7 @@ export default function StudentProfilePage() {
                     <div className="flex-1">
                       <Input
                         placeholder="Add a new skill (e.g. Python, Leadership, etc.)"
+                        className="bg-white/90"
                         value={newSkill}
                         onChange={(e) => setNewSkill(e.target.value)}
                         onKeyDown={(e) => {
@@ -790,7 +931,7 @@ export default function StudentProfilePage() {
                     <Textarea
                       id="skill-description"
                       placeholder="Describe your skills and expertise in more detail..."
-                      className="min-h-[100px]"
+                      className="min-h-[100px] bg-white/90"
                       defaultValue="I have strong programming skills in Python and Java, with experience in machine learning frameworks like TensorFlow and PyTorch. I'm also proficient in data analysis using pandas and numpy, and have good problem-solving abilities."
                     />
                   </div>

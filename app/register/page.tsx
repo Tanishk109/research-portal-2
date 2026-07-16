@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -16,10 +16,12 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { AlertCircle } from "lucide-react"
 
 export default function RegisterPage() {
-  const [role, setRole] = useState("student")
-  const [firstName, setFirstName] = useState("")
-  const [lastName, setLastName] = useState("")
-  const [email, setEmail] = useState("")
+  const searchParams = useSearchParams()
+  const initialRole = searchParams?.get("role") === "faculty" ? "faculty" : "student"
+  const [role, setRole] = useState(initialRole)
+  const [firstName, setFirstName] = useState(searchParams?.get("firstName") || "")
+  const [lastName, setLastName] = useState(searchParams?.get("lastName") || "")
+  const [email, setEmail] = useState(searchParams?.get("email") || "")
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
 
@@ -49,6 +51,16 @@ export default function RegisterPage() {
       .then((data) => setIpAddress(data.ip))
       .catch((error) => console.error("Error fetching IP:", error))
   }, [])
+
+  useEffect(() => {
+    const error = searchParams?.get("error")
+    if (error === "google_account_not_found") {
+      toast({
+        title: "Complete registration",
+        description: "No portal account exists for that Google email yet. Complete the required profile fields to register.",
+      })
+    }
+  }, [searchParams, toast])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

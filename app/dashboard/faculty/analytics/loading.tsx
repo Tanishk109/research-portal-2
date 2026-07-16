@@ -5,9 +5,9 @@ import FacultyDashboardHeader from "@/components/faculty-dashboard-header"
 
 export default function AnalyticsLoading() {
   return (
-    <div className="flex min-h-screen flex-col bg-gray-50">
+    <div className="flex min-h-screen flex-col dashboard-shell">
       <FacultyDashboardHeader />
-      <main className="flex-1 p-6 md:p-10">
+      <main className="flex-1 px-4 py-8 md:px-6">
         <div className="grid gap-6">
           <div>
             <Skeleton className="h-10 w-64 mb-2" />
@@ -19,7 +19,7 @@ export default function AnalyticsLoading() {
             {Array(4)
               .fill(0)
               .map((_, i) => (
-                <Card key={i} className="border-t-4 border-t-gray-200">
+                <Card key={i} className="dashboard-panel rounded-lg">
                   <CardHeader className="pb-2">
                     <Skeleton className="h-5 w-32" />
                   </CardHeader>
@@ -31,7 +31,7 @@ export default function AnalyticsLoading() {
           </div>
 
           <Tabs defaultValue="projects" className="space-y-4">
-            <TabsList className="bg-white border">
+            <TabsList className="grid h-auto w-full grid-cols-1 gap-1 rounded-lg border border-slate-200 bg-white/90 p-1 shadow-sm md:grid-cols-3">
               <TabsTrigger value="projects" disabled>
                 Project Analytics
               </TabsTrigger>
@@ -48,7 +48,7 @@ export default function AnalyticsLoading() {
                 {Array(3)
                   .fill(0)
                   .map((_, i) => (
-                    <Card key={i} className={i === 2 ? "md:col-span-2" : ""}>
+                    <Card key={i} className={i === 2 ? "dashboard-panel rounded-lg md:col-span-2" : "dashboard-panel rounded-lg"}>
                       <CardHeader>
                         <Skeleton className="h-6 w-48 mb-1" />
                         <Skeleton className="h-4 w-64" />

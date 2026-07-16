@@ -37,8 +37,6 @@
   ],
   "exclude": [
     "node_modules",
-    "scripts",
-    "test-auth.ts",
-    "execute-auth-test.ts"
+    "scripts"
   ]
 }

@@ -8,6 +8,9 @@ export interface IUser {
   last_name: string;
   email: string;
   password_hash: string;
+  google_id?: string;
+  auth_provider?: "credentials" | "google";
+  profile_picture_url?: string;
   created_at?: Date;
   updated_at?: Date;
 }
@@ -19,6 +22,9 @@ const UserSchema = new Schema<IUser>(
     last_name: { type: String, required: true, maxlength: 100 },
     email: { type: String, required: true, unique: true, index: true, maxlength: 255 },
     password_hash: { type: String, required: true },
+    google_id: { type: String, unique: true, sparse: true, index: true },
+    auth_provider: { type: String, enum: ["credentials", "google"], default: "credentials" },
+    profile_picture_url: { type: String },
     created_at: { type: Date, default: Date.now },
     updated_at: { type: Date, default: Date.now },
   },
@@ -34,6 +40,8 @@ export interface IFacultyProfile {
   specialization: string;
   date_of_joining: Date;
   date_of_birth: Date;
+  phone?: string;
+  bio?: string;
   created_at?: Date;
   updated_at?: Date;
 }
@@ -46,6 +54,8 @@ const FacultyProfileSchema = new Schema<IFacultyProfile>(
     specialization: { type: String, required: true, maxlength: 255 },
     date_of_joining: { type: Date, required: true },
     date_of_birth: { type: Date, required: true },
+    phone: { type: String, maxlength: 30 },
+    bio: { type: String, maxlength: 2000 },
     created_at: { type: Date, default: Date.now },
     updated_at: { type: Date, default: Date.now },
   },
@@ -61,6 +71,8 @@ export interface IStudentProfile {
   year: string;
   cgpa: number;
   cv_url?: string;
+  phone?: string;
+  bio?: string;
   created_at?: Date;
   updated_at?: Date;
 }
@@ -73,6 +85,8 @@ const StudentProfileSchema = new Schema<IStudentProfile>(
     year: { type: String, required: true, maxlength: 20, index: true },
     cgpa: { type: Number, required: true, min: 0, max: 10 },
     cv_url: { type: String, maxlength: 255 },
+    phone: { type: String, maxlength: 30 },
+    bio: { type: String, maxlength: 2000 },
     created_at: { type: Date, default: Date.now },
     updated_at: { type: Date, default: Date.now },
   },
@@ -84,6 +98,8 @@ export interface IStudentCV {
   _id?: string;
   user_id: mongoose.Types.ObjectId;
   file_url: string;
+  file_name?: string;
+  mime_type?: string;
   uploaded_at?: Date;
 }
 
@@ -91,6 +107,8 @@ const StudentCVSchema = new Schema<IStudentCV>(
   {
     user_id: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
     file_url: { type: String, required: true },
+    file_name: { type: String, maxlength: 255, default: "Resume.pdf" },
+    mime_type: { type: String, maxlength: 100, default: "application/pdf" },
     uploaded_at: { type: Date, default: Date.now },
   }
 );
@@ -255,14 +273,27 @@ const TestEntrySchema = new Schema<ITestEntry>(
   { timestamps: { createdAt: "created_at", updatedAt: "updated_at" } }
 );
 
-// Create models (use existing if already compiled)
-export const User = (mongoose.models.User as Model<IUser>) || mongoose.model<IUser>("User", UserSchema);
-export const FacultyProfile = (mongoose.models.FacultyProfile as Model<IFacultyProfile>) || mongoose.model<IFacultyProfile>("FacultyProfile", FacultyProfileSchema);
-export const StudentProfile = (mongoose.models.StudentProfile as Model<IStudentProfile>) || mongoose.model<IStudentProfile>("StudentProfile", StudentProfileSchema);
-export const StudentCV = (mongoose.models.StudentCV as Model<IStudentCV>) || mongoose.model<IStudentCV>("StudentCV", StudentCVSchema);
-export const StudentCertificate = (mongoose.models.StudentCertificate as Model<IStudentCertificate>) || mongoose.model<IStudentCertificate>("StudentCertificate", StudentCertificateSchema);
-export const StudentSkill = (mongoose.models.StudentSkill as Model<IStudentSkill>) || mongoose.model<IStudentSkill>("StudentSkill", StudentSkillSchema);
-export const Project = (mongoose.models.Project as Model<IProject>) || mongoose.model<IProject>("Project", ProjectSchema);
-export const Application = (mongoose.models.Application as Model<IApplication>) || mongoose.model<IApplication>("Application", ApplicationSchema);
-export const LoginActivity = (mongoose.models.LoginActivity as Model<ILoginActivity>) || mongoose.model<ILoginActivity>("LoginActivity", LoginActivitySchema);
-export const TestEntry = (mongoose.models.TestEntry as Model<ITestEntry>) || mongoose.model<ITestEntry>("TestEntry", TestEntrySchema);
+function getModel<T>(name: string, schema: Schema<T>): Model<T> {
+  const existingModel = mongoose.models[name] as Model<T> | undefined;
+
+  if (existingModel && process.env.NODE_ENV !== "development") {
+    return existingModel;
+  }
+
+  if (existingModel) {
+    mongoose.deleteModel(name);
+  }
+
+  return mongoose.model<T>(name, schema);
+}
+
+export const User = getModel<IUser>("User", UserSchema);
+export const FacultyProfile = getModel<IFacultyProfile>("FacultyProfile", FacultyProfileSchema);
+export const StudentProfile = getModel<IStudentProfile>("StudentProfile", StudentProfileSchema);
+export const StudentCV = getModel<IStudentCV>("StudentCV", StudentCVSchema);
+export const StudentCertificate = getModel<IStudentCertificate>("StudentCertificate", StudentCertificateSchema);
+export const StudentSkill = getModel<IStudentSkill>("StudentSkill", StudentSkillSchema);
+export const Project = getModel<IProject>("Project", ProjectSchema);
+export const Application = getModel<IApplication>("Application", ApplicationSchema);
+export const LoginActivity = getModel<ILoginActivity>("LoginActivity", LoginActivitySchema);
+export const TestEntry = getModel<ITestEntry>("TestEntry", TestEntrySchema);

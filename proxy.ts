@@ -3,7 +3,17 @@ import { jwtVerify } from "jose"
 import { JWT_SECRET } from "@/lib/env"
 
 // Paths that require authentication
-const protectedPaths = ["/dashboard", "/api/auth/me", "/api/users", "/api/projects", "/api/applications", "/api/dashboard"]
+const protectedPaths = [
+  "/admin",
+  "/dashboard",
+  "/api/admin",
+  "/api/auth/me",
+  "/api/users",
+  "/api/projects",
+  "/api/applications",
+  "/api/dashboard",
+  "/api/login-activity",
+]
 
 // Paths that are public (no authentication required)
 const publicPaths = [
@@ -18,7 +28,6 @@ const publicPaths = [
   "/api/registration-test",
   "/api/health",
   "/debug",
-  "/admin",
 ]
 
 // Role-based path restrictions

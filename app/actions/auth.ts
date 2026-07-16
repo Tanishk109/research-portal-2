@@ -83,6 +83,7 @@ export async function login(formData: FormData) {
       role: user.role,
       email: user.email,
       name: `${user.first_name} ${user.last_name}`,
+      profilePictureUrl: user.profile_picture_url || null,
     })
       .setProtectedHeader({ alg: "HS256" })
       .setJti(nanoid())
@@ -102,6 +103,7 @@ export async function login(formData: FormData) {
         role: user.role,
         name: `${user.first_name} ${user.last_name}`,
         email: user.email,
+        profilePictureUrl: user.profile_picture_url || null,
       },
     }
   } catch (error) {

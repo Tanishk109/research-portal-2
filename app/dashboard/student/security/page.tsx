@@ -11,17 +11,20 @@ export const metadata: Metadata = {
 
 export default function StudentSecurityPage() {
   return (
-    <div className="flex min-h-screen flex-col bg-gray-50">
+    <div className="flex min-h-screen flex-col dashboard-shell">
       <StudentDashboardHeader />
-      <main className="flex-1 p-6 md:p-10">
-        <div className="grid gap-6">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight text-[#0c2461]">Account Security</h1>
-            <p className="text-muted-foreground">Manage your account security and review login activity</p>
-          </div>
+      <main className="flex-1 px-4 py-8 md:px-6">
+        <div className="container mx-auto grid gap-6">
+          <section className="dashboard-hero rounded-lg p-6 text-white md:p-8">
+            <p className="text-sm font-medium uppercase tracking-[0.24em] text-cyan-100">Student Security</p>
+            <h1 className="mt-3 text-3xl font-semibold tracking-tight md:text-5xl">Account Security</h1>
+            <p className="mt-4 max-w-2xl text-sm leading-6 text-slate-100 md:text-base">
+              Manage account protection and review recent access from the same student workspace.
+            </p>
+          </section>
 
           <div className="grid gap-6 md:grid-cols-3">
-            <Card className="border-t-4 border-t-[#0c2461]">
+            <Card className="dashboard-panel dashboard-lift rounded-lg">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Security Status</CardTitle>
                 <Shield className="h-4 w-4 text-[#0c2461]" />
@@ -31,7 +34,7 @@ export default function StudentSecurityPage() {
                 <p className="text-xs text-muted-foreground">Last checked: Today</p>
               </CardContent>
             </Card>
-            <Card className="border-t-4 border-t-[#e1b12c]">
+            <Card className="dashboard-panel dashboard-lift rounded-lg">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Password Status</CardTitle>
                 <Lock className="h-4 w-4 text-[#e1b12c]" />
@@ -41,7 +44,7 @@ export default function StudentSecurityPage() {
                 <p className="text-xs text-muted-foreground">Last changed: 30 days ago</p>
               </CardContent>
             </Card>
-            <Card className="border-t-4 border-t-[#4a69bd]">
+            <Card className="dashboard-panel dashboard-lift rounded-lg">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Active Sessions</CardTitle>
                 <KeyRound className="h-4 w-4 text-[#4a69bd]" />

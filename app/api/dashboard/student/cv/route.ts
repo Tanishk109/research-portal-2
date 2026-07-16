@@ -7,6 +7,19 @@ import { toObjectId, toPlainObject } from "@/lib/db"
 // Force dynamic rendering for this route (uses cookies)
 export const dynamic = 'force-dynamic'
 
+function isPdfDataUrl(fileUrl: unknown) {
+  return typeof fileUrl === "string" && /^data:application\/pdf(?:;[^,]*)?,/i.test(fileUrl)
+}
+
+function sanitizeResumeFileName(fileName: unknown) {
+  if (typeof fileName !== "string") {
+    return "Resume.pdf"
+  }
+
+  const trimmed = fileName.trim().replace(/[\\/:*?"<>|]/g, "")
+  return trimmed ? trimmed.slice(0, 255) : "Resume.pdf"
+}
+
 // GET /api/dashboard/student/cv - Get CV for current user
 export async function GET() {
   try {
@@ -54,31 +67,49 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json()
-    const { file_url } = body
+    const { file_url, file_name } = body
 
     if (!file_url) {
       return NextResponse.json({ success: false, message: "Missing file_url" }, { status: 400 })
     }
 
-    // Insert or update CV metadata
+    if (!isPdfDataUrl(file_url)) {
+      return NextResponse.json({ success: false, message: "Please upload your resume as a PDF file." }, { status: 400 })
+    }
+
+    const resumeFileName = sanitizeResumeFileName(file_name)
+
+    const uploadedAt = new Date()
+
+    // Insert or update resume metadata
     const existing = await StudentCV.findOne({ user_id: userId })
     if (existing) {
       await StudentCV.findByIdAndUpdate(existing._id, {
         file_url,
-        uploaded_at: new Date(),
+        file_name: resumeFileName,
+        mime_type: "application/pdf",
+        uploaded_at: uploadedAt,
       })
     } else {
       await StudentCV.create({
         user_id: userId,
         file_url,
-        uploaded_at: new Date(),
+        file_name: resumeFileName,
+        mime_type: "application/pdf",
+        uploaded_at: uploadedAt,
       })
     }
 
-    return NextResponse.json({ success: true, message: "CV saved successfully" })
+    const savedResume = await StudentCV.findOne({ user_id: userId }).lean()
+
+    return NextResponse.json({
+      success: true,
+      message: "Resume saved successfully",
+      data: savedResume ? toPlainObject(savedResume) : null,
+    })
   } catch (error) {
     console.error("Error saving CV:", error)
-    return NextResponse.json({ success: false, message: "Failed to save CV" }, { status: 500 })
+    return NextResponse.json({ success: false, message: "Failed to save resume" }, { status: 500 })
   }
 }
 
@@ -99,9 +130,9 @@ export async function DELETE() {
 
     await StudentCV.deleteOne({ user_id: userId })
 
-    return NextResponse.json({ success: true, message: "CV removed successfully" })
+    return NextResponse.json({ success: true, message: "Resume removed successfully" })
   } catch (error) {
     console.error("Error deleting CV:", error)
-    return NextResponse.json({ success: false, message: "Failed to remove CV" }, { status: 500 })
+    return NextResponse.json({ success: false, message: "Failed to remove resume" }, { status: 500 })
   }
 }

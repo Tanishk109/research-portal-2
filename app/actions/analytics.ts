@@ -1,9 +1,9 @@
 "use server"
 
 import { connectToMongoDB } from "@/lib/mongodb"
-import { Project, Application, FacultyProfile, StudentProfile } from "@/lib/models"
+import { Project, Application, FacultyProfile } from "@/lib/models"
 import { getCurrentUser } from "./auth"
-import { toObjectId, toPlainObject } from "@/lib/db"
+import { toObjectId } from "@/lib/db"
 
 // Get project analytics
 export async function getProjectAnalytics() {

@@ -1,6 +1,5 @@
 import { notFound } from "next/navigation"
 import Link from "next/link"
-import Image from "next/image"
 import { ArrowLeft, BookOpen, Calendar, Mail, Users } from "lucide-react"
 import { connectToMongoDB } from "@/lib/mongodb"
 import { FacultyProfile, Project, User } from "@/lib/models"
@@ -8,6 +7,7 @@ import { toObjectId, toPlainObject } from "@/lib/db"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 
 export const dynamic = "force-dynamic"
 
@@ -73,13 +73,15 @@ export default async function FacultyProfilePage({ params }: { params: Promise<{
             <Card>
               <CardContent className="pt-6">
                 <div className="flex flex-col items-center text-center">
-                  <Image
-                    src="/placeholder-user.jpg"
-                    alt={`${faculty.user.first_name} ${faculty.user.last_name}`}
-                    width={112}
-                    height={112}
-                    className="rounded-full border-2 border-primary-200"
-                  />
+                  <Avatar className="h-28 w-28 border-2 border-primary-200">
+                    <AvatarImage
+                      src={faculty.user.profile_picture_url || ""}
+                      alt={`${faculty.user.first_name} ${faculty.user.last_name}`}
+                    />
+                    <AvatarFallback className="text-2xl">
+                      {`${faculty.user.first_name?.charAt(0) || ""}${faculty.user.last_name?.charAt(0) || ""}`}
+                    </AvatarFallback>
+                  </Avatar>
                   <h1 className="mt-4 text-2xl font-bold">
                     {faculty.user.first_name} {faculty.user.last_name}
                   </h1>

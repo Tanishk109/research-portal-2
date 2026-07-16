@@ -4,9 +4,9 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { BookOpen, Calendar, Clock, Users, ArrowLeft } from "lucide-react"
+import { BookOpen, Calendar, Clock, Users, ArrowLeft, CheckCircle } from "lucide-react"
 import { Separator } from "@/components/ui/separator"
-import { getProjectById } from "@/app/actions/projects"
+import { getProjectById, hasStudentAppliedToProject } from "@/app/actions/projects"
 import { ShareButton } from "@/components/share-button"
 
 export default async function ProjectDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -16,6 +16,8 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
   if (!project) {
     notFound()
   }
+
+  const alreadyApplied = await hasStudentAppliedToProject(id)
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -69,9 +71,18 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
               </div>
               <div className="flex gap-2">
                 <ShareButton title={project.title} />
-                <Link href={`/projects/${project.id}/apply`}>
-                  <Button>Apply Now</Button>
-                </Link>
+                {alreadyApplied ? (
+                  <Link href="/dashboard/student/applications">
+                    <Button variant="outline" className="gap-2">
+                      <CheckCircle className="h-4 w-4" />
+                      Already Applied
+                    </Button>
+                  </Link>
+                ) : (
+                  <Link href={`/projects/${project.id}/apply`}>
+                    <Button>Apply Now</Button>
+                  </Link>
+                )}
               </div>
             </div>
           </div>
@@ -174,9 +185,18 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
                   </div>
                 </CardContent>
                 <CardFooter>
-                  <Link href={`/projects/${project.id}/apply`} className="w-full">
-                    <Button className="w-full">Apply Now</Button>
-                  </Link>
+                  {alreadyApplied ? (
+                    <Link href="/dashboard/student/applications" className="w-full">
+                      <Button variant="outline" className="w-full gap-2">
+                        <CheckCircle className="h-4 w-4" />
+                        View Your Application
+                      </Button>
+                    </Link>
+                  ) : (
+                    <Link href={`/projects/${project.id}/apply`} className="w-full">
+                      <Button className="w-full">Apply Now</Button>
+                    </Link>
+                  )}
                 </CardFooter>
               </Card>
 
@@ -188,7 +208,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
                   <div className="flex flex-col items-center text-center">
                     <Avatar className="h-24 w-24 mb-4">
                       <AvatarImage
-                        src={project.faculty_avatar || "/placeholder.svg?height=128&width=128"}
+                        src={project.faculty_avatar || ""}
                         alt={project.faculty_name}
                       />
                       <AvatarFallback>

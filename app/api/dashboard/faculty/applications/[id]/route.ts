@@ -2,8 +2,8 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { updateApplicationStatus } from "@/app/actions/applications";
 import { connectToMongoDB } from "@/lib/mongodb";
-import { Application, Project, FacultyProfile, StudentProfile, User } from "@/lib/models";
-import { toObjectId, toPlainObject } from "@/lib/db";
+import { Application, FacultyProfile } from "@/lib/models";
+import { toObjectId } from "@/lib/db";
 import { getCurrentUser } from "@/app/actions/auth";
 
 // Force dynamic rendering for this route (uses cookies)
@@ -87,25 +87,75 @@ export async function GET(
       },
       { $unwind: "$user" },
       {
+        $lookup: {
+          from: "studentcvs",
+          localField: "student_id",
+          foreignField: "user_id",
+          as: "studentCV",
+        },
+      },
+      { $unwind: { path: "$studentCV", preserveNullAndEmptyArrays: true } },
+      {
         $project: {
+          _id: 0,
           id: { $toString: "$_id" },
           status: 1,
           message: "$cover_letter",
           feedback: 1,
-          applied_at: 1,
+          applied_at: {
+            $dateToString: {
+              date: "$applied_at",
+              format: "%Y-%m-%dT%H:%M:%S.%LZ",
+              timezone: "UTC",
+              onNull: null,
+            },
+          },
           project_id: { $toString: "$project._id" },
           project_title: "$project.title",
           project_description: "$project.description",
           research_area: "$project.research_area",
           positions: "$project.positions",
-          deadline: "$project.deadline",
-          start_date: "$project.start_date",
+          deadline: {
+            $dateToString: {
+              date: "$project.deadline",
+              format: "%Y-%m-%dT%H:%M:%S.%LZ",
+              timezone: "UTC",
+              onNull: null,
+            },
+          },
+          start_date: {
+            $dateToString: {
+              date: "$project.start_date",
+              format: "%Y-%m-%dT%H:%M:%S.%LZ",
+              timezone: "UTC",
+              onNull: null,
+            },
+          },
           student_id: { $toString: "$user._id" },
           student_name: { $concat: ["$user.first_name", " ", "$user.last_name"] },
+          student_avatar: { $ifNull: ["$user.profile_picture_url", null] },
           registration_number: "$studentProfile.registration_number",
           year: "$studentProfile.year",
           cgpa: "$studentProfile.cgpa",
           department: "$studentProfile.department",
+          resume_id: {
+            $cond: [
+              { $ifNull: ["$studentCV._id", false] },
+              { $toString: "$studentCV._id" },
+              null,
+            ],
+          },
+          resume_url: { $ifNull: ["$studentCV.file_url", null] },
+          resume_file_name: { $ifNull: ["$studentCV.file_name", "Resume.pdf"] },
+          resume_mime_type: { $ifNull: ["$studentCV.mime_type", "application/pdf"] },
+          resume_uploaded_at: {
+            $dateToString: {
+              date: "$studentCV.uploaded_at",
+              format: "%Y-%m-%dT%H:%M:%S.%LZ",
+              timezone: "UTC",
+              onNull: null,
+            },
+          },
         },
       },
       { $limit: 1 },
@@ -135,10 +185,20 @@ export async function GET(
       student: {
         id: app.student_id,
         name: app.student_name,
+        avatar: app.student_avatar || null,
         registration_number: app.registration_number,
         department: app.department,
         year: app.year || "",
         cgpa: app.cgpa,
+        resume: app.resume_url
+          ? {
+              id: app.resume_id,
+              file_url: app.resume_url,
+              file_name: app.resume_file_name || "Resume.pdf",
+              mime_type: app.resume_mime_type || "application/pdf",
+              uploaded_at: app.resume_uploaded_at,
+            }
+          : null,
       },
     };
 

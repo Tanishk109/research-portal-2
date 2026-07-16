@@ -3,9 +3,9 @@ import StudentDashboardHeader from "@/components/student-dashboard-header"
 
 export default function Loading() {
   return (
-    <div className="flex min-h-screen flex-col bg-gray-50">
+    <div className="flex min-h-screen flex-col dashboard-shell">
       <StudentDashboardHeader />
-      <main className="flex-1 p-6 md:p-10">
+      <main className="flex-1 px-4 py-8 md:px-6">
         <div className="max-w-4xl mx-auto">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
             <div>

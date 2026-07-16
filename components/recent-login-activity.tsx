@@ -59,7 +59,7 @@ export default function RecentLoginActivity({ userRole }: RecentLoginActivityPro
   }
 
   return (
-    <Card>
+    <Card className="dashboard-panel rounded-lg">
       <CardHeader>
         <CardTitle>Recent Login Activity</CardTitle>
         <CardDescription>Monitor your recent account access</CardDescription>
@@ -78,7 +78,7 @@ export default function RecentLoginActivity({ userRole }: RecentLoginActivityPro
         ) : (
           <div className="space-y-4">
             {activities.map((activity) => (
-              <div key={activity.id} className="flex items-center justify-between border-b pb-3">
+              <div key={activity.id} className="flex items-center justify-between rounded-lg border border-slate-200/80 bg-white/75 p-3">
                 <div className="flex items-center gap-3">
                   <div className="bg-primary/10 p-2 rounded-full">{getDeviceIcon(activity.device_type)}</div>
                   <div>

@@ -2,11 +2,10 @@ import type { NextRequest } from "next/server"
 import { NextResponse } from "next/server"
 import { connectToMongoDB } from "@/lib/mongodb"
 import { User, FacultyProfile, StudentProfile, LoginActivity } from "@/lib/models"
-import { comparePassword, toObjectId, toPlainObject } from "@/lib/db"
+import { comparePassword, toPlainObject } from "@/lib/db"
 import { SignJWT } from "jose"
 import { nanoid } from "nanoid"
-import { JWT_SECRET, JWT_EXPIRATION, COOKIE_SETTINGS } from "@/lib/env"
-import { cookies } from "next/headers"
+import { JWT_SECRET, JWT_EXPIRATION } from "@/lib/env"
 
 // Force dynamic rendering for this route (uses cookies)
 export const dynamic = 'force-dynamic'
@@ -86,6 +85,7 @@ export async function POST(request: NextRequest) {
       role: user.role,
       email: user.email,
       name: `${user.first_name} ${user.last_name}`,
+      profilePictureUrl: user.profile_picture_url || null,
     })
       .setProtectedHeader({ alg: "HS256" })
       .setJti(nanoid())
@@ -104,6 +104,7 @@ export async function POST(request: NextRequest) {
           firstName: user.first_name,
           lastName: user.last_name,
           email: user.email,
+          profilePictureUrl: user.profile_picture_url || null,
           name: `${user.first_name} ${user.last_name}`,
           profile,
         },

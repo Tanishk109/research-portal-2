@@ -75,7 +75,7 @@ export default function LoginActivityTable() {
   }
 
   return (
-    <Card>
+    <Card className="dashboard-panel rounded-lg">
       <CardHeader>
         <CardTitle>Login Activity</CardTitle>
         <CardDescription>Review your recent login history to ensure account security</CardDescription>
