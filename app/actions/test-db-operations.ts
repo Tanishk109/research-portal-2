@@ -1,286 +1,161 @@
 "use server"
 
-import { sql } from "@/lib/db"
+import { toPlainObject } from "@/lib/db"
+import { connectToMongoDB, getMongoDBInfo } from "@/lib/mongodb"
+import { Application, FacultyProfile, LoginActivity, Project, StudentProfile, TestEntry, User } from "@/lib/models"
 
-// Type for test entry
-type TestEntry = {
-  id?: number
-  title: string
-  description: string
-  created_at?: string
-}
-
-// Create a test entry
 export async function createTestEntry(data: { title: string; description: string }) {
   try {
-    // Validate input
-    if (!data.title || !data.title.trim()) {
+    if (!data.title?.trim()) {
       return { success: false, message: "Title is required" }
     }
 
-    // Create test entry
-    const result = await sql`
-      INSERT INTO test_entries (title, description)
-      VALUES (${data.title}, ${data.description})
-      RETURNING id, title, description, created_at
-    `
+    await connectToMongoDB()
+    const entry = await TestEntry.create({
+      title: data.title.trim(),
+      description: data.description,
+    })
 
-    if (result && result.length > 0) {
-      return {
-        success: true,
-        message: "Test entry created successfully",
-        entry: result[0],
-      }
-    } else {
-      return {
-        success: false,
-        message: "Failed to create test entry - no result returned",
-      }
+    return {
+      success: true,
+      message: "Test entry created successfully",
+      entry: toPlainObject(entry),
     }
   } catch (error) {
     console.error("Error creating test entry:", error)
-
-    // Check if the error is due to the table not existing
-    if (error instanceof Error && error.message.includes("relation") && error.message.includes("does not exist")) {
-      // Try to create the table
-      try {
-        await sql`
-          CREATE TABLE test_entries (
-            id SERIAL PRIMARY KEY,
-            title VARCHAR(255) NOT NULL,
-            description TEXT,
-            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-          )
-        `
-
-        // Try the insert again
-        const result = await sql`
-          INSERT INTO test_entries (title, description)
-          VALUES (${data.title}, ${data.description})
-          RETURNING id, title, description, created_at
-        `
-
-        if (result && result.length > 0) {
-          return {
-            success: true,
-            message: "Test table created and entry added successfully",
-            entry: result[0],
-          }
-        }
-      } catch (tableError) {
-        console.error("Error creating test_entries table:", tableError)
-        return {
-          success: false,
-          message: `Failed to create test_entries table: ${
-            tableError instanceof Error ? tableError.message : String(tableError)
-          }`,
-        }
-      }
-    }
-
     return {
       success: false,
-      message: `Database error: ${error instanceof Error ? error.message : String(error)}`,
+      message: `MongoDB error: ${error instanceof Error ? error.message : String(error)}`,
     }
   }
 }
 
-// Get all test entries
 export async function getTestEntries() {
   try {
-    // Check if table exists
-    const tableExists = await sql`
-      SELECT EXISTS (
-        SELECT FROM information_schema.tables 
-        WHERE table_schema = 'public' 
-        AND table_name = 'test_entries'
-      )
-    `
-
-    if (!tableExists[0].exists) {
-      // Create the table if it doesn't exist
-      await sql`
-        CREATE TABLE test_entries (
-          id SERIAL PRIMARY KEY,
-          title VARCHAR(255) NOT NULL,
-          description TEXT,
-          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-        )
-      `
-      return {
-        success: true,
-        message: "Test table created successfully",
-        entries: [],
-      }
-    }
-
-    // Get all entries
-    const entries = await sql`
-      SELECT id, title, description, created_at
-      FROM test_entries
-      ORDER BY created_at DESC
-    `
+    await connectToMongoDB()
+    const entries = await TestEntry.find().sort({ created_at: -1 }).lean()
 
     return {
       success: true,
       message: `Retrieved ${entries.length} entries`,
-      entries,
+      entries: entries.map(toPlainObject),
     }
   } catch (error) {
     console.error("Error getting test entries:", error)
     return {
       success: false,
-      message: `Database error: ${error instanceof Error ? error.message : String(error)}`,
+      message: `MongoDB error: ${error instanceof Error ? error.message : String(error)}`,
       entries: [],
     }
   }
 }
 
-// Update a test entry
-export async function updateTestEntry(id: number, data: { title: string; description: string }) {
+export async function updateTestEntry(id: string, data: { title: string; description: string }) {
   try {
-    // Validate input
     if (!id) {
       return { success: false, message: "Entry ID is required" }
     }
 
-    if (!data.title || !data.title.trim()) {
+    if (!data.title?.trim()) {
       return { success: false, message: "Title is required" }
     }
 
-    // Update entry
-    const result = await sql`
-      UPDATE test_entries
-      SET title = ${data.title}, description = ${data.description}
-      WHERE id = ${id}
-      RETURNING id, title, description, created_at
-    `
+    await connectToMongoDB()
+    const entry = await TestEntry.findByIdAndUpdate(
+      id,
+      { title: data.title.trim(), description: data.description, updated_at: new Date() },
+      { new: true },
+    )
 
-    if (result && result.length > 0) {
-      return {
-        success: true,
-        message: "Test entry updated successfully",
-        entry: result[0],
-      }
-    } else {
-      return {
-        success: false,
-        message: "Entry not found or update failed",
-      }
+    if (!entry) {
+      return { success: false, message: "Entry not found or update failed" }
+    }
+
+    return {
+      success: true,
+      message: "Test entry updated successfully",
+      entry: toPlainObject(entry),
     }
   } catch (error) {
     console.error("Error updating test entry:", error)
     return {
       success: false,
-      message: `Database error: ${error instanceof Error ? error.message : String(error)}`,
+      message: `MongoDB error: ${error instanceof Error ? error.message : String(error)}`,
     }
   }
 }
 
-// Delete a test entry
-export async function deleteTestEntry(id: number) {
+export async function deleteTestEntry(id: string) {
   try {
-    // Validate input
     if (!id) {
       return { success: false, message: "Entry ID is required" }
     }
 
-    // Delete entry
-    const result = await sql`
-      DELETE FROM test_entries
-      WHERE id = ${id}
-      RETURNING id
-    `
+    await connectToMongoDB()
+    const result = await TestEntry.findByIdAndDelete(id)
 
-    if (result && result.length > 0) {
-      return {
-        success: true,
-        message: "Test entry deleted successfully",
-        id: result[0].id,
-      }
-    } else {
-      return {
-        success: false,
-        message: "Entry not found or delete failed",
-      }
+    if (!result) {
+      return { success: false, message: "Entry not found or delete failed" }
+    }
+
+    return {
+      success: true,
+      message: "Test entry deleted successfully",
+      id,
     }
   } catch (error) {
     console.error("Error deleting test entry:", error)
     return {
       success: false,
-      message: `Database error: ${error instanceof Error ? error.message : String(error)}`,
+      message: `MongoDB error: ${error instanceof Error ? error.message : String(error)}`,
     }
   }
 }
 
-// Delete all test entries
 export async function deleteAllTestEntries() {
   try {
-    // Check if table exists
-    const tableExists = await sql`
-      SELECT EXISTS (
-        SELECT FROM information_schema.tables 
-        WHERE table_schema = 'public' 
-        AND table_name = 'test_entries'
-      )
-    `
-
-    if (!tableExists[0].exists) {
-      return {
-        success: true,
-        message: "No test entries table exists",
-      }
-    }
-
-    // Delete all entries
-    const result = await sql`
-      DELETE FROM test_entries
-      RETURNING id
-    `
+    await connectToMongoDB()
+    const result = await TestEntry.deleteMany({})
 
     return {
       success: true,
-      message: `Deleted ${result.length} test entries`,
-      count: result.length,
+      message: `Deleted ${result.deletedCount} test entries`,
+      count: result.deletedCount,
     }
   } catch (error) {
     console.error("Error deleting all test entries:", error)
     return {
       success: false,
-      message: `Database error: ${error instanceof Error ? error.message : String(error)}`,
+      message: `MongoDB error: ${error instanceof Error ? error.message : String(error)}`,
     }
   }
 }
 
-// Get database stats
 export async function getDatabaseStats() {
   try {
-    // Get database connection info
-    const connectionInfo = await sql`
-      SELECT current_database() as database_name,
-             current_user as username,
-             version() as version
-    `
-
-    // Get table counts
-    const tableCounts = await sql`
-      SELECT 
-        (SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public') as table_count,
-        (SELECT COUNT(*) FROM users) as user_count,
-        (SELECT COUNT(*) FROM login_activity) as login_activity_count
-    `
-
-    // Get database size
-    const dbSize = await sql`
-      SELECT pg_size_pretty(pg_database_size(current_database())) as database_size
-    `
+    await connectToMongoDB()
+    const info = await getMongoDBInfo()
 
     return {
       success: true,
       stats: {
-        connection: connectionInfo[0],
-        counts: tableCounts[0],
-        size: dbSize[0].database_size,
+        connection: {
+          database_name: info.database_name,
+          host: info.host,
+          port: info.port,
+          ready_state: info.readyState,
+          version: info.version,
+        },
+        counts: {
+          collection_count: info.collections,
+          user_count: await User.countDocuments(),
+          faculty_profile_count: await FacultyProfile.countDocuments(),
+          student_profile_count: await StudentProfile.countDocuments(),
+          project_count: await Project.countDocuments(),
+          application_count: await Application.countDocuments(),
+          login_activity_count: await LoginActivity.countDocuments(),
+          test_entry_count: await TestEntry.countDocuments(),
+        },
         timestamp: new Date().toISOString(),
       },
     }
@@ -288,7 +163,7 @@ export async function getDatabaseStats() {
     console.error("Error getting database stats:", error)
     return {
       success: false,
-      message: `Database error: ${error instanceof Error ? error.message : String(error)}`,
+      message: `MongoDB error: ${error instanceof Error ? error.message : String(error)}`,
     }
   }
 }

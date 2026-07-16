@@ -9,10 +9,11 @@ import { toObjectId, toPlainObject } from "@/lib/db"
 export const dynamic = 'force-dynamic'
 
 // GET /api/users/[id]/login-activity - Get login activity for a specific user
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     await connectToMongoDB()
-    const userId = toObjectId(params.id)
+    const { id } = await params
+    const userId = toObjectId(id)
 
     if (!userId) {
       return createApiResponse(false, "Invalid user ID")
@@ -31,8 +32,8 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
     const success = searchParams.get("success")
 
     // Cache key based on params
-    const cacheKey = `user-login-activity:list:${params.id}:${success || 'all'}:${limit}:${offset}`
-    const cacheCountKey = `user-login-activity:count:${params.id}:${success || 'all'}`
+    const cacheKey = `user-login-activity:list:${id}:${success || 'all'}:${limit}:${offset}`
+    const cacheCountKey = `user-login-activity:count:${id}:${success || 'all'}`
     const cachedActivities = cache.get(cacheKey)
     const cachedCount = cache.get(cacheCountKey)
     if (cachedActivities && cachedCount) {

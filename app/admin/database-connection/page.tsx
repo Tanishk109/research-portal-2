@@ -1,12 +1,19 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { useEffect, useState } from "react"
+import { AlertCircle, Boxes, CheckCircle, Database, FileText, RefreshCw, Server, User, X } from "lucide-react"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Database, X, RefreshCw, Table, User, FileText, AlertCircle, CheckCircle, Server } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+
+interface CollectionStatus {
+  exists: boolean
+  count: number
+  status: string
+  error?: string
+}
 
 interface DatabaseStatus {
   success: boolean
@@ -15,25 +22,26 @@ interface DatabaseStatus {
     status: string
     info: {
       database_name: string
-      user: string
-      version: string
-      timestamp: string
+      host?: string
+      version?: string
+      timestamp?: string
     }
-    tables: Record<
-      string,
-      {
-        exists: boolean
-        count: number
-        status: string
-        error?: string
-      }
-    >
+    collections: Record<string, CollectionStatus>
   }
 }
 
+const collections = [
+  { name: "users", icon: <User className="h-4 w-4" />, description: "User accounts" },
+  { name: "faculty_profiles", icon: <User className="h-4 w-4" />, description: "Faculty information" },
+  { name: "student_profiles", icon: <User className="h-4 w-4" />, description: "Student information" },
+  { name: "projects", icon: <FileText className="h-4 w-4" />, description: "Research projects" },
+  { name: "applications", icon: <FileText className="h-4 w-4" />, description: "Project applications" },
+  { name: "login_activity", icon: <Database className="h-4 w-4" />, description: "Login tracking" },
+]
+
 export default function DatabaseConnectionPage() {
   const [loading, setLoading] = useState(true)
-  const [testingTable, setTestingTable] = useState("")
+  const [testingCollection, setTestingCollection] = useState("")
   const [dbStatus, setDbStatus] = useState<DatabaseStatus | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -58,30 +66,29 @@ export default function DatabaseConnectionPage() {
     }
   }
 
-  const testTable = async (tableName: string) => {
-    setTestingTable(tableName)
+  const testCollection = async (collectionName: string) => {
+    setTestingCollection(collectionName)
 
     try {
       const response = await fetch("/api/db-test", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ table: tableName }),
+        body: JSON.stringify({ collection: collectionName }),
       })
 
       const data = await response.json()
 
       if (data.success) {
-        alert(`✅ Table "${tableName}" test successful!\n\nRecords found: ${data.data.count}`)
-        // Refresh the main status to update counts
+        alert(`Collection "${collectionName}" is accessible.\n\nDocuments found: ${data.data.count}`)
         fetchDbStatus()
       } else {
-        alert(`❌ Table "${tableName}" test failed!\n\nError: ${data.message}`)
+        alert(`Collection "${collectionName}" test failed.\n\nError: ${data.message}`)
       }
     } catch (err) {
-      console.error(`Error testing table ${tableName}:`, err)
-      alert(`❌ Error testing table "${tableName}"`)
+      console.error(`Error testing collection ${collectionName}:`, err)
+      alert(`Error testing collection "${collectionName}"`)
     } finally {
-      setTestingTable("")
+      setTestingCollection("")
     }
   }
 
@@ -89,30 +96,18 @@ export default function DatabaseConnectionPage() {
     fetchDbStatus()
   }, [])
 
+  const collectionStatus = dbStatus?.data?.collections || {}
+
   return (
     <div className="container py-10">
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-3xl font-bold">MySQL Database Connection</h1>
-          <p className="text-muted-foreground">Test and monitor your MySQL database connection</p>
+          <h1 className="text-3xl font-bold">MongoDB Connection</h1>
+          <p className="text-muted-foreground">Test and monitor your MongoDB database connection</p>
         </div>
-        <Button
-          variant="outline"
-          onClick={fetchDbStatus}
-          disabled={loading}
-          className="flex items-center gap-2 bg-transparent"
-        >
-          {loading ? (
-            <>
-              <RefreshCw className="h-4 w-4 animate-spin" />
-              <span>Checking...</span>
-            </>
-          ) : (
-            <>
-              <RefreshCw className="h-4 w-4" />
-              <span>Refresh</span>
-            </>
-          )}
+        <Button variant="outline" onClick={fetchDbStatus} disabled={loading} className="flex items-center gap-2">
+          <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+          <span>{loading ? "Checking..." : "Refresh"}</span>
         </Button>
       </div>
 
@@ -129,14 +124,12 @@ export default function DatabaseConnectionPage() {
           <CardHeader className="pb-2">
             <CardTitle className="text-lg flex items-center gap-2">
               <Database className="h-5 w-5" />
-              MySQL Connection Status
+              MongoDB Connection Status
             </CardTitle>
           </CardHeader>
           <CardContent>
             {loading ? (
-              <div className="flex justify-center py-4">
-                <div className="animate-spin h-6 w-6 border-4 border-primary border-t-transparent rounded-full"></div>
-              </div>
+              <RefreshCw className="h-6 w-6 animate-spin" />
             ) : dbStatus?.success ? (
               <div className="flex items-center gap-2">
                 <Badge className="bg-green-100 text-green-800 hover:bg-green-200">
@@ -144,7 +137,7 @@ export default function DatabaseConnectionPage() {
                   Connected
                 </Badge>
                 <span className="text-sm text-muted-foreground">
-                  {dbStatus?.data?.info?.database_name || "Unknown database"}
+                  {dbStatus.data?.info?.database_name || "Unknown database"}
                 </span>
               </div>
             ) : (
@@ -162,47 +155,26 @@ export default function DatabaseConnectionPage() {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-lg flex items-center gap-2">
-              <Table className="h-5 w-5" />
-              Tables Status
+              <Boxes className="h-5 w-5" />
+              Collections Status
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="flex justify-center py-4">
-                <div className="animate-spin h-6 w-6 border-4 border-primary border-t-transparent rounded-full"></div>
-              </div>
-            ) : dbStatus?.data?.tables ? (() => {
-                  const tables = dbStatus.data.tables;
-                  if (tables && typeof tables === 'object' && !Array.isArray(tables)) {
-                    return Object.entries(tables).map(([tableName, tableInfo]) => (
-                  <div key={tableName} className="flex items-center justify-between">
-                    <span className="text-sm font-medium">{tableName}</span>
-                    <div className="flex items-center gap-2">
-                      {tableInfo.exists ? (
-                        <>
-                          <Badge variant="outline" className="text-xs">
-                            {tableInfo.count} records
-                          </Badge>
-                          <CheckCircle className="h-4 w-4 text-green-500" />
-                        </>
-                      ) : (
-                        <X className="h-4 w-4 text-red-500" />
-                      )}
-                    </div>
+          <CardContent className="space-y-2">
+            {Object.entries(collectionStatus).length > 0 ? (
+              Object.entries(collectionStatus).map(([collectionName, info]) => (
+                <div key={collectionName} className="flex items-center justify-between">
+                  <span className="text-sm font-medium">{collectionName}</span>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className="text-xs">
+                      {info.count} documents
+                    </Badge>
+                    {info.exists ? <CheckCircle className="h-4 w-4 text-green-500" /> : <X className="h-4 w-4 text-red-500" />}
                   </div>
-                    ));
-                  } else {
-                    // Debug log
-                    console.log('dbStatus.data.tables is not a valid object:', tables);
-                    return (
-                      <div className="text-sm text-muted-foreground">
-                        No table information available
-              </div>
-                    );
-                  }
-                })()
-              : <div className="text-sm text-muted-foreground">No table information available</div>
-            }
+                </div>
+              ))
+            ) : (
+              <div className="text-sm text-muted-foreground">No collection information available</div>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -210,7 +182,7 @@ export default function DatabaseConnectionPage() {
       <Tabs defaultValue="status">
         <TabsList className="mb-4">
           <TabsTrigger value="status">Connection Details</TabsTrigger>
-          <TabsTrigger value="tables">Test Tables</TabsTrigger>
+          <TabsTrigger value="collections">Test Collections</TabsTrigger>
           <TabsTrigger value="raw">Raw Response</TabsTrigger>
         </TabsList>
 
@@ -221,53 +193,28 @@ export default function DatabaseConnectionPage() {
                 <Server className="h-5 w-5" />
                 Database Information
               </CardTitle>
-              <CardDescription>Details about your MySQL database connection</CardDescription>
+              <CardDescription>Details about your MongoDB connection</CardDescription>
             </CardHeader>
             <CardContent>
-              {loading ? (
-                <div className="flex justify-center py-8">
-                  <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full"></div>
-                </div>
-              ) : dbStatus?.success && dbStatus.data ? (
-                <div className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-muted/50 rounded-lg">
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">Database Name</p>
-                      <p className="text-sm font-mono">{dbStatus?.data?.info?.database_name || "Unknown database"}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">User</p>
-                      <p className="text-sm font-mono">{dbStatus?.data?.info?.user || "Unknown user"}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">MySQL Version</p>
-                      <p className="text-sm font-mono">{dbStatus?.data?.info?.version || "Unknown version"}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">Last Checked</p>
-                      <p className="text-sm font-mono">{dbStatus?.data?.info?.timestamp ? new Date(dbStatus.data.info.timestamp).toLocaleString() : "Unknown"}</p>
-                    </div>
+              {dbStatus?.success && dbStatus.data ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-muted/50 rounded-lg">
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Database Name</p>
+                    <p className="text-sm font-mono">{dbStatus.data.info.database_name}</p>
                   </div>
-
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                    {dbStatus.data.tables && typeof dbStatus.data.tables === 'object' && !Array.isArray(dbStatus.data.tables) ? 
-                      Object.entries(dbStatus.data.tables).map(([tableName, tableInfo]) => (
-                      <div key={tableName} className="p-3 border rounded-lg">
-                        <div className="flex items-center justify-between mb-1">
-                          <h4 className="font-medium text-sm">{tableName}</h4>
-                          {tableInfo.exists ? (
-                            <CheckCircle className="h-4 w-4 text-green-500" />
-                          ) : (
-                            <X className="h-4 w-4 text-red-500" />
-                          )}
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                          {tableInfo.exists ? `${tableInfo.count} records` : "Missing"}
-                        </p>
-                      </div>
-                      ))
-                      : <div className="col-span-full text-center text-muted-foreground">No table information available</div>
-                    }
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Host</p>
+                    <p className="text-sm font-mono">{dbStatus.data.info.host || "Unknown host"}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">MongoDB Version</p>
+                    <p className="text-sm font-mono">{dbStatus.data.info.version || "Unknown version"}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Last Checked</p>
+                    <p className="text-sm font-mono">
+                      {dbStatus.data.info.timestamp ? new Date(dbStatus.data.info.timestamp).toLocaleString() : "Unknown"}
+                    </p>
                   </div>
                 </div>
               ) : (
@@ -279,41 +226,34 @@ export default function DatabaseConnectionPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="tables">
+        <TabsContent value="collections">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Table className="h-5 w-5" />
-                Test Individual Tables
+                <Boxes className="h-5 w-5" />
+                Test Individual Collections
               </CardTitle>
-              <CardDescription>Click on any table to test its connectivity and get record count</CardDescription>
+              <CardDescription>Click a collection to test connectivity and get document count</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {[
-                  { name: "users", icon: <User className="h-4 w-4" />, description: "User accounts" },
-                  { name: "faculty_profiles", icon: <User className="h-4 w-4" />, description: "Faculty information" },
-                  { name: "student_profiles", icon: <User className="h-4 w-4" />, description: "Student information" },
-                  { name: "projects", icon: <FileText className="h-4 w-4" />, description: "Research projects" },
-                  { name: "applications", icon: <FileText className="h-4 w-4" />, description: "Project applications" },
-                  { name: "login_activity", icon: <Database className="h-4 w-4" />, description: "Login tracking" },
-                ].map((table) => (
+                {collections.map((collection) => (
                   <Button
-                    key={table.name}
+                    key={collection.name}
                     variant="outline"
-                    className="h-auto py-4 justify-start bg-transparent"
-                    onClick={() => testTable(table.name)}
-                    disabled={testingTable === table.name}
+                    className="h-auto py-4 justify-start"
+                    onClick={() => testCollection(collection.name)}
+                    disabled={testingCollection === collection.name}
                   >
                     <div className="flex items-center gap-3 w-full">
-                      {table.icon}
+                      {collection.icon}
                       <div className="text-left flex-1">
-                        <div className="font-medium">{table.name}</div>
+                        <div className="font-medium">{collection.name}</div>
                         <div className="text-xs text-muted-foreground">
-                          {testingTable === table.name ? "Testing..." : table.description}
+                          {testingCollection === collection.name ? "Testing..." : collection.description}
                         </div>
                       </div>
-                      {testingTable === table.name && <RefreshCw className="h-4 w-4 animate-spin" />}
+                      {testingCollection === collection.name && <RefreshCw className="h-4 w-4 animate-spin" />}
                     </div>
                   </Button>
                 ))}

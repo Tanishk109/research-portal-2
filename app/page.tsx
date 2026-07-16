@@ -10,7 +10,7 @@ import { connectToMongoDB } from "@/lib/mongodb"
 import { User, FacultyProfile } from "@/lib/models"
 import { toPlainObject } from "@/lib/db"
 
-export const revalidate = 300
+export const dynamic = "force-dynamic"
 
 export default async function Home() {
   // Fetch first 3 faculty for homepage preview

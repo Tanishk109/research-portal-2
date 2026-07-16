@@ -131,8 +131,7 @@ export async function updateStudentProfile(data: StudentProfileData) {
       updated_at: new Date(),
     })
 
-    // Update student profile
-    await StudentProfile.findOneAndUpdate(
+    const updatedProfile = await StudentProfile.findOneAndUpdate(
       { user_id: userId },
       {
         registration_number: data.registrationNumber,
@@ -143,8 +142,12 @@ export async function updateStudentProfile(data: StudentProfileData) {
         bio: data.bio || undefined,
         updated_at: new Date(),
       },
-      { upsert: false }
+      { upsert: true, new: true, setDefaultsOnInsert: true }
     )
+
+    if (!updatedProfile) {
+      return { success: false, message: "Failed to create student profile" }
+    }
 
     revalidatePath("/dashboard/student/profile")
     revalidatePath("/dashboard/student")
@@ -185,8 +188,7 @@ export async function updateFacultyProfile(data: FacultyProfileData) {
       updated_at: new Date(),
     })
 
-    // Update faculty profile
-    await FacultyProfile.findOneAndUpdate(
+    const updatedProfile = await FacultyProfile.findOneAndUpdate(
       { user_id: userId },
       {
         faculty_id: data.facultyId,
@@ -198,8 +200,12 @@ export async function updateFacultyProfile(data: FacultyProfileData) {
         bio: data.bio || undefined,
         updated_at: new Date(),
       },
-      { upsert: false }
+      { upsert: true, new: true, setDefaultsOnInsert: true }
     )
+
+    if (!updatedProfile) {
+      return { success: false, message: "Failed to create faculty profile" }
+    }
 
     revalidatePath("/dashboard/faculty/profile")
     revalidatePath("/dashboard/faculty")

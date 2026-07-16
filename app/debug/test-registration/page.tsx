@@ -67,17 +67,17 @@ export default function TestRegistrationPage() {
     return data.data
   }
 
-  const testTableExists = async (tableName: string) => {
+  const testCollectionExists = async (collectionName: string) => {
     const response = await fetch("/api/db-test", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ table: tableName }),
+      body: JSON.stringify({ collection: collectionName }),
     })
 
     const data = await response.json()
 
     if (!data.success) {
-      throw new Error(`Table ${tableName} does not exist or is not accessible`)
+      throw new Error(`Collection ${collectionName} does not exist or is not accessible`)
     }
 
     return data.data
@@ -173,10 +173,10 @@ export default function TestRegistrationPage() {
       // Test database connection
       await runTest("Database Connection", testDatabaseConnection)
 
-      // Test required tables
-      const tables = ["users", "faculty_profiles", "student_profiles", "login_activity"]
-      for (const table of tables) {
-        await runTest(`Table: ${table}`, () => testTableExists(table))
+      // Test required collections
+      const collections = ["users", "faculty_profiles", "student_profiles", "login_activity"]
+      for (const collection of collections) {
+        await runTest(`Collection: ${collection}`, () => testCollectionExists(collection))
       }
 
       // Test faculty registration
@@ -296,7 +296,7 @@ export default function TestRegistrationPage() {
                   <h3 className="font-medium mb-2">What This Test Does:</h3>
                   <ul className="list-disc list-inside space-y-1 text-sm">
                     <li>Verifies database connection</li>
-                    <li>Checks if all required tables exist</li>
+                    <li>Checks if all required MongoDB collections are accessible</li>
                     <li>Tests faculty registration process</li>
                     <li>Tests student registration process</li>
                     <li>Verifies login functionality</li>
@@ -306,8 +306,8 @@ export default function TestRegistrationPage() {
                 <div>
                   <h3 className="font-medium mb-2">Before Running Tests:</h3>
                   <ul className="list-disc list-inside space-y-1 text-sm">
-                    <li>Ensure your DATABASE_URL is configured</li>
-                    <li>Run database setup script if tables don't exist</li>
+                    <li>Ensure your MONGODB_URI is configured</li>
+                    <li>Check MongoDB model initialization if collections are not accessible</li>
                     <li>Check that JWT_SECRET is set</li>
                   </ul>
                 </div>
@@ -324,16 +324,16 @@ export default function TestRegistrationPage() {
                 <div>
                   <h3 className="font-medium mb-2 text-red-600">Database Connection Failed</h3>
                   <ul className="list-disc list-inside space-y-1 text-sm">
-                    <li>Check if DATABASE_URL environment variable is set</li>
+                    <li>Check if MONGODB_URI environment variable is set</li>
                     <li>Verify database server is running</li>
                     <li>Test connection manually using database client</li>
                   </ul>
                 </div>
                 <div>
-                  <h3 className="font-medium mb-2 text-red-600">Tables Missing</h3>
+                  <h3 className="font-medium mb-2 text-red-600">Collections Missing</h3>
                   <ul className="list-disc list-inside space-y-1 text-sm">
                     <li>
-                      Run: <code className="bg-gray-100 px-1 rounded">npx tsx scripts/setup-database.ts</code>
+                      Run: <code className="bg-gray-100 px-1 rounded">npm run setup:mongodb</code>
                     </li>
                     <li>Check database permissions</li>
                     <li>Verify schema creation</li>

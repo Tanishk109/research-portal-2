@@ -12,7 +12,7 @@ import { toast } from "@/components/ui/use-toast"
 import { Loader2 } from "lucide-react"
 
 interface ApplicationFormProps {
-  projectId: number
+  projectId: string
   projectTitle: string
   facultyName: string
   onCancel: () => void

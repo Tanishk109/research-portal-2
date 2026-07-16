@@ -5,10 +5,11 @@ import { createApiResponse, handleApiError, parseJsonBody } from "@/lib/api-util
 import { toObjectId } from "@/lib/db"
 
 // POST /api/users/[id]/skills - Save skills for a user
-export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     await connectToMongoDB()
-    const userId = toObjectId(params.id)
+    const { id } = await params
+    const userId = toObjectId(id)
     if (!userId) {
       return createApiResponse(false, "Invalid user ID")
     }
@@ -38,10 +39,11 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 }
 
 // GET /api/users/[id]/skills - Get all skills for a user
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     await connectToMongoDB()
-    const userId = toObjectId(params.id)
+    const { id } = await params
+    const userId = toObjectId(id)
     if (!userId) {
       return createApiResponse(false, "Invalid user ID")
     }

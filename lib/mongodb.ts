@@ -1,7 +1,9 @@
 import mongoose from "mongoose";
 
+import { MONGODB_URI as CONFIGURED_MONGODB_URI } from "./env";
+
 // Get MongoDB URI from environment variable (required)
-let MONGODB_URI = process.env.MONGODB_URI || process.env.DATABASE_URL;
+let MONGODB_URI = CONFIGURED_MONGODB_URI;
 
 if (!MONGODB_URI) {
   throw new Error("Please define MONGODB_URI in your environment variables");
@@ -23,7 +25,6 @@ try {
         url.searchParams.set("w", "majority");
       }
       MONGODB_URI = url.toString();
-      console.log("MongoDB URI updated with database name:", MONGODB_URI.replace(/:[^:@]+@/, ":****@"));
     }
   }
 } catch (error) {
@@ -86,7 +87,7 @@ export async function checkMongoDBHealth(): Promise<boolean> {
   try {
     await connectToMongoDB();
     if (mongoose.connection.readyState === 1) {
-      await mongoose.connection.db.admin().ping();
+      await mongoose.connection.db?.admin().ping();
       return true;
     }
     return false;
@@ -102,6 +103,9 @@ export async function getMongoDBInfo() {
     await connectToMongoDB();
     
     const db = mongoose.connection.db;
+    if (!db) {
+      throw new Error("MongoDB connection is not ready");
+    }
     const admin = db.admin();
     
     const serverStatus = await admin.serverStatus();

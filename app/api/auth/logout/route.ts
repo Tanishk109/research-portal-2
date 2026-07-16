@@ -7,7 +7,8 @@ export const dynamic = 'force-dynamic'
 // POST /api/auth/logout - Logout
 export async function POST() {
   try {
-    cookies().delete("session")
+    const cookieStore = await cookies()
+    cookieStore.delete("session")
     return createApiResponse(true, "Logout successful")
   } catch (error) {
     return handleApiError(error, "Logout failed")

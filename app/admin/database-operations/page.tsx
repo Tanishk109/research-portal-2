@@ -14,6 +14,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogClose,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -31,7 +32,7 @@ import {
 } from "@/app/actions/test-db-operations"
 
 type TestEntry = {
-  id: number
+  id: string
   title: string
   description: string
   created_at: string
@@ -137,7 +138,7 @@ export default function DatabaseOperationsPage() {
   }
 
   // Delete an entry
-  const handleDeleteEntry = async (id: number) => {
+  const handleDeleteEntry = async (id: string) => {
     setLoading(true)
     setError(null)
     try {
@@ -290,9 +291,9 @@ export default function DatabaseOperationsPage() {
                         </DialogDescription>
                       </DialogHeader>
                       <DialogFooter>
-                        <Button variant="outline" onClick={() => {}}>
-                          Cancel
-                        </Button>
+                        <DialogClose asChild>
+                          <Button variant="outline">Cancel</Button>
+                        </DialogClose>
                         <Button variant="destructive" onClick={handleDeleteAllEntries}>
                           Delete All
                         </Button>
@@ -427,7 +428,7 @@ export default function DatabaseOperationsPage() {
                 <Database className="h-5 w-5" />
                 Database Statistics
               </CardTitle>
-              <CardDescription>Information about your database connection and tables</CardDescription>
+              <CardDescription>Information about your MongoDB connection and collections</CardDescription>
             </CardHeader>
             <CardContent>
               {statsLoading ? (
@@ -450,29 +451,29 @@ export default function DatabaseOperationsPage() {
                         <span>{dbStats.connection.database_name}</span>
                       </div>
                       <div className="flex justify-between py-1 border-b">
-                        <span className="font-medium">Username:</span>
-                        <span>{dbStats.connection.username}</span>
+                        <span className="font-medium">Host:</span>
+                        <span>{dbStats.connection.host}</span>
                       </div>
                       <div className="flex justify-between py-1 border-b">
-                        <span className="font-medium">Database Size:</span>
-                        <span>{dbStats.size}</span>
+                        <span className="font-medium">Ready State:</span>
+                        <span>{dbStats.connection.ready_state}</span>
                       </div>
                       <div className="flex justify-between py-1 border-b">
-                        <span className="font-medium">PostgreSQL Version:</span>
-                        <span className="text-sm">{dbStats.connection.version.split(",")[0]}</span>
+                        <span className="font-medium">MongoDB Version:</span>
+                        <span className="text-sm">{dbStats.connection.version}</span>
                       </div>
                     </div>
                   </div>
 
                   <div>
-                    <h3 className="text-lg font-medium mb-2">Table Statistics</h3>
+                    <h3 className="text-lg font-medium mb-2">Collection Statistics</h3>
                     <div className="grid grid-cols-3 gap-4">
                       <Card className="bg-primary/5">
                         <CardHeader className="pb-2">
-                          <CardTitle className="text-lg">Tables</CardTitle>
+                          <CardTitle className="text-lg">Collections</CardTitle>
                         </CardHeader>
                         <CardContent>
-                          <div className="text-3xl font-bold">{dbStats.counts.table_count}</div>
+                          <div className="text-3xl font-bold">{dbStats.counts.collection_count}</div>
                         </CardContent>
                       </Card>
                       <Card className="bg-primary/5">

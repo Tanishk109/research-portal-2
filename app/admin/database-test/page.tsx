@@ -89,7 +89,7 @@ export default function DatabaseTestPage() {
               <Database className="h-5 w-5" />
               Database Connection
             </CardTitle>
-            <CardDescription>Test the connection to your Neon PostgreSQL database</CardDescription>
+            <CardDescription>Test the connection to your MongoDB database</CardDescription>
           </CardHeader>
           <CardContent>
             {connectionStatus.tested && (
@@ -198,11 +198,11 @@ export default function DatabaseTestPage() {
         <h2 className="text-xl font-semibold mb-4">Troubleshooting Tips</h2>
         <ul className="list-disc pl-5 space-y-2">
           <li>
-            Ensure your <code>DATABASE_URL</code> environment variable is correctly set in your <code>.env</code> file
+            Ensure your <code>MONGODB_URI</code> environment variable is correctly set in your <code>.env</code> file
           </li>
-          <li>Check that your Neon PostgreSQL database is active and accessible</li>
+          <li>Check that your MongoDB cluster is active and accessible</li>
           <li>Verify that your IP address is allowed in the database firewall settings</li>
-          <li>Make sure the database user has sufficient permissions to create tables and indexes</li>
+          <li>Make sure the database user has sufficient permissions to create collections and indexes</li>
           <li>If using Vercel, ensure the environment variable is properly configured in your project settings</li>
         </ul>
       </div>

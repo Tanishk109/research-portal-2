@@ -49,7 +49,7 @@ export default function FacultyProfilePage() {
       
       if (result.success && result.profile) {
         const profileData = result.profile
-        setProfile(profileData)
+        setProfile(profileData as any)
         setFormData({
           firstName: (profileData as any).first_name || "",
           lastName: (profileData as any).last_name || "",

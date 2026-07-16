@@ -1,21 +1,23 @@
+import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
-import { getProjectById } from "@/app/actions/projects";
+import { getProjectById, updateProject } from "@/app/actions/projects";
+import { toObjectId } from "@/lib/db";
 
 export async function GET(
-  request: Request,
-  { params }: { params: { id: string } }
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const projectId = Number.parseInt(params.id);
-    
-    if (isNaN(projectId) || projectId <= 0) {
+    const { id } = await params;
+
+    if (!toObjectId(id)) {
       return NextResponse.json(
         { success: false, message: "Invalid project ID" },
         { status: 400 }
       );
     }
 
-    const project = await getProjectById(projectId);
+    const project = await getProjectById(id);
     
     if (!project) {
       return NextResponse.json(
@@ -34,3 +36,33 @@ export async function GET(
   }
 }
 
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+
+    if (!toObjectId(id)) {
+      return NextResponse.json(
+        { success: false, message: "Invalid project ID" },
+        { status: 400 }
+      );
+    }
+
+    const body = await request.json();
+    const result = await updateProject(id, body);
+
+    if (!result.success) {
+      return NextResponse.json(result, { status: 400 });
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Error updating project:", error);
+    return NextResponse.json(
+      { success: false, message: "Failed to update project" },
+      { status: 500 }
+    );
+  }
+}

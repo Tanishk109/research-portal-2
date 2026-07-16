@@ -79,47 +79,54 @@ research-portal-2/
 ├── tsconfig.json
 └── README.md
 
+---
 
+## ⚙️ Getting Started
 
+### 1️⃣ Clone the repository
+```bash
+git clone https://github.com/Tanishk109/research-portal-2.git
+cd research-portal-2
+2️⃣ Install dependencies
+npm install
+3️⃣ Configure environment variables
+Create a .env.local file using the template:
+cp .env.example .env.local
+Fill in the required values.
+4️⃣ Run the development server
+npm run dev
+The application will be available at:
+http://localhost:3000
 
-## 🔐 Security & Best Practices
+🔐 Security & Best Practices
+Environment variables are never committed
+Sensitive credentials are managed via .env.local
+Dependency conflicts resolved without force installs
+Patched Next.js versions used to avoid known vulnerabilities
+Clean Git history and repository hygiene enforced
 
-- Environment variables are **never committed**
-- Sensitive credentials are managed via `.env.local`
-- Dependency conflicts resolved without force installs
-- Patched Next.js versions used to avoid known vulnerabilities
-- Clean Git history and repository hygiene enforced
+📄 Documentation
+Detailed engineering and deployment notes are available in the docs/ directory, including:
+MongoDB migration and persistence handling
+Deployment workflow on Vercel
+Authentication fixes and debugging notes
+Infrastructure and environment configuration
+These documents reflect real-world debugging, decision-making, and problem-solving during development.
 
-## 📄 Documentation
+🚀 Deployment
+The application is designed for seamless deployment on Vercel:
+Supports environment-based configuration
+Optimized for Next.js production builds
+Scales automatically with traffic
 
-Detailed engineering and deployment notes are available in the `docs/` directory, including:
-- MongoDB migration and persistence handling
-- Deployment workflow on Vercel
-- Authentication fixes and debugging notes
-- Infrastructure and environment configuration
+🔮 Future Enhancements
+Role-based access control (Admin / Faculty / Student)
+Advanced search and filtering
+Project application and approval workflow
+Analytics dashboard for research insights
+Faculty verification and moderation system
 
-These documents reflect **real-world debugging, decision-making, and problem-solving** during development.
-
-## 🚀 Deployment
-
-The application is designed for seamless deployment on **Vercel**:
-- Supports environment-based configuration
-- Optimized for Next.js production builds
-- Scales automatically with traffic
-
-## 🔮 Future Enhancements
-
-- Role-based access control (Admin / Faculty / Student)
-- Advanced search and filtering
-- Project application and approval workflow
-- Analytics dashboard for research insights
-- Faculty verification and moderation system
-
-## 👨‍💻 Author
-
+👨‍💻 Author
 Tanishk Mittal
-B.Tech CSE (IoT & Intelligent Systems)  
+B.Tech CSE (IoT & Intelligent Systems)
 Full-stack developer interested in scalable systems, secure backend design, and building real-world solutions.
-
-
-

@@ -42,16 +42,18 @@ export default function NewProjectPage() {
 
     const form = e.currentTarget
     const formData = new FormData(form)
+    const submitter = (e.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null
+    const status = submitter?.value === "draft" ? "draft" : "active"
 
     const data = {
       title: formData.get("title") as string,
       description: formData.get("description") as string,
-      longDescription: formData.get("description") as string, // You may want a separate field for longDescription
+      longDescription: formData.get("description") as string,
       researchArea: formData.get("research-area") as string,
       positions: Number(formData.get("positions")),
       startDate: formData.get("start-date") as string,
       deadline: formData.get("deadline") as string,
-      status: "active" as "active",
+      status,
       minCgpa: formData.get("min-cgpa") ? Number(formData.get("min-cgpa")) : 0,
       eligibility: formData.get("eligibility") as string,
       prerequisites: formData.get("prerequisites") as string,
@@ -66,7 +68,7 @@ export default function NewProjectPage() {
       })
       const result = await res.json()
       if (res.ok && result.success) {
-        toast.success("Project created successfully!")
+        toast.success(status === "draft" ? "Draft saved successfully!" : "Project created successfully!")
         router.push("/dashboard/faculty/projects")
       } else {
         toast.error(result.message || "Failed to create project.")
@@ -212,10 +214,10 @@ export default function NewProjectPage() {
                   Cancel
                 </Button>
                 <div className="flex gap-2">
-                  <Button type="button" variant="outline">
+                  <Button type="submit" name="status" value="draft" variant="outline" disabled={isLoading}>
                     Save as Draft
                   </Button>
-                  <Button type="submit" disabled={isLoading}>
+                  <Button type="submit" name="status" value="active" disabled={isLoading}>
                     {isLoading ? "Creating..." : "Create Project"}
                   </Button>
                 </div>

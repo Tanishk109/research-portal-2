@@ -20,9 +20,9 @@ export default function ProjectsPage() {
   const [projects, setProjects] = useState<ProjectWithFaculty[]>([])
   const [loading, setLoading] = useState(true)
   const [filters, setFilters] = useState({
-    department: searchParams.get("department") || "",
-    researchArea: searchParams.get("area") || "",
-    searchTerm: searchParams.get("search") || "",
+    department: searchParams?.get("department") || "",
+    researchArea: searchParams?.get("area") || "",
+    searchTerm: searchParams?.get("search") || "",
   })
 
   useEffect(() => {
@@ -204,7 +204,7 @@ export default function ProjectsPage() {
                             </AvatarFallback>
                           </Avatar>
                           <CardDescription>
-                            {project.faculty_name} • {project.faculty_department}
+                            {project.faculty_name} • {project.department}
                           </CardDescription>
                         </div>
                       </div>
@@ -219,7 +219,7 @@ export default function ProjectsPage() {
                   <CardContent>
                     <p className="text-sm mb-4">{project.description}</p>
                     <div className="flex flex-wrap gap-2">
-                      {(typeof project.tags === 'string' ? project.tags.split(',') : project.tags || []).map((tag, i) => (
+                      {(project.tags || []).map((tag: string, i: number) => (
                         <Badge key={i} variant="secondary">
                           {tag.trim()}
                         </Badge>

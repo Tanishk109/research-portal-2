@@ -32,7 +32,7 @@ export default function FacultyProjectsPage() {
   const [projects, setProjects] = useState<any[]>([])
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
-  const [deletingProjectId, setDeletingProjectId] = useState<number | null>(null)
+  const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null)
 
   useEffect(() => {
     const fetchProjects = async () => {
@@ -55,7 +55,7 @@ export default function FacultyProjectsPage() {
     fetchProjects()
   }, [toast])
 
-  const handleDeleteProject = async (id: number) => {
+  const handleDeleteProject = async (id: string) => {
     try {
       setDeletingProjectId(id)
       const result = await deleteProject(id)
@@ -232,10 +232,7 @@ export default function FacultyProjectsPage() {
                           </div>
                           <div>
                             <p className="text-muted-foreground">Applications</p>
-                            <p className="font-medium">
-                              {/* This would be fetched from the database in a real implementation */}
-                              {Math.floor(Math.random() * 10)}
-                            </p>
+                            <p className="font-medium">{project.application_count ?? 0}</p>
                           </div>
                         </div>
                       </CardContent>

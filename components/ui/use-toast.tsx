@@ -3,7 +3,7 @@
 
 import type React from "react"
 
-import { useState, createContext, useContext } from "react"
+import { useState, createContext, useContext, useEffect, useCallback } from "react"
 import { X } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -23,7 +23,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<(ToastProps & { id: number })[]>([])
   const [counter, setCounter] = useState(0)
 
-  const toast = (props: ToastProps) => {
+  const toast = useCallback((props: ToastProps) => {
     const id = counter
     setCounter((prev) => prev + 1)
     setToasts((prev) => [...prev, { ...props, id }])
@@ -32,7 +32,16 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     setTimeout(() => {
       setToasts((prev) => prev.filter((t) => t.id !== id))
     }, 5000)
-  }
+  }, [counter])
+
+  useEffect(() => {
+    const handleToast = (event: Event) => {
+      toast((event as CustomEvent<ToastProps>).detail)
+    }
+
+    window.addEventListener("toast", handleToast)
+    return () => window.removeEventListener("toast", handleToast)
+  }, [toast])
 
   const dismissToast = (id: number) => {
     setToasts((prev) => prev.filter((t) => t.id !== id))

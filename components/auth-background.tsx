@@ -2,6 +2,15 @@
 
 import { useEffect, useRef } from "react"
 
+type GradientPoint = {
+  x: number
+  y: number
+  radius: number
+  color: { r: number; g: number; b: number }
+  vx: number
+  vy: number
+}
+
 export function AuthBackground() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
@@ -30,7 +39,7 @@ export function AuthBackground() {
     ]
 
     // Create gradient points
-    const gradientPoints = []
+    const gradientPoints: GradientPoint[] = []
     for (let i = 0; i < 10; i++) {
       gradientPoints.push({
         x: Math.random() * canvas.width,

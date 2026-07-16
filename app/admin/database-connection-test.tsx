@@ -48,7 +48,7 @@ export default function DatabaseConnectionTest() {
             <Database className="h-6 w-6" />
             Database Connection Test
           </CardTitle>
-          <CardDescription>Test the connection to your Neon PostgreSQL database</CardDescription>
+          <CardDescription>Test the connection to your MongoDB database</CardDescription>
         </CardHeader>
         <CardContent>
           {status === "loading" ? (

@@ -16,13 +16,7 @@ export default function ApplyProjectPage({ params }: { params: { id: string } })
   useEffect(() => {
     async function fetchProject() {
       try {
-        const projectId = Number.parseInt(params.id)
-        if (isNaN(projectId)) {
-          router.push("/projects")
-          return
-        }
-
-        const res = await fetch(`/api/projects/${projectId}`)
+        const res = await fetch(`/api/projects/${params.id}`)
         const result = await res.json()
         
         if (!res.ok || !result.success || !result.project) {

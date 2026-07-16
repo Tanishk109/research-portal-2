@@ -1,11 +1,11 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { useEffect, useState } from "react"
+import { AlertCircle, Boxes, CheckCircle, Database, FileText, RefreshCw, Users, XCircle } from "lucide-react"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
-import { CheckCircle, XCircle, AlertCircle, RefreshCw, Database, Users, FileText } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 
 interface DatabaseHealth {
   connection: {
@@ -13,7 +13,7 @@ interface DatabaseHealth {
     message: string
     data?: any
   }
-  tables: {
+  collections: {
     [key: string]: {
       success: boolean
       data?: { count: number }
@@ -21,6 +21,8 @@ interface DatabaseHealth {
     }
   }
 }
+
+const collections = ["users", "faculty_profiles", "student_profiles", "projects", "applications", "login_activity"]
 
 export default function DatabaseHealthPage() {
   const [health, setHealth] = useState<DatabaseHealth | null>(null)
@@ -32,34 +34,29 @@ export default function DatabaseHealthPage() {
     setError(null)
 
     try {
-      // Check database connection
       const connectionResponse = await fetch("/api/db-test")
       const connectionData = await connectionResponse.json()
+      const collectionChecks: DatabaseHealth["collections"] = {}
 
-      // Check individual tables
-      const tables = ["users", "faculty_profiles", "student_profiles", "projects", "applications", "login_activity"]
-      const tableChecks: { [key: string]: any } = {}
-
-      for (const table of tables) {
+      for (const collection of collections) {
         try {
-          const tableResponse = await fetch("/api/db-test", {
+          const response = await fetch("/api/db-test", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ table }),
+            body: JSON.stringify({ collection }),
           })
-          const tableData = await tableResponse.json()
-          tableChecks[table] = tableData
-        } catch (err) {
-          tableChecks[table] = {
+          collectionChecks[collection] = await response.json()
+        } catch {
+          collectionChecks[collection] = {
             success: false,
-            message: `Failed to check ${table} table`,
+            message: `Failed to check ${collection} collection`,
           }
         }
       }
 
       setHealth({
         connection: connectionData,
-        tables: tableChecks,
+        collections: collectionChecks,
       })
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
@@ -86,7 +83,7 @@ export default function DatabaseHealthPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold">Database Health</h1>
-            <p className="text-gray-600">Monitor database connection and table status</p>
+            <p className="text-gray-600">Monitor MongoDB connection and collection status</p>
           </div>
           <Button onClick={checkDatabaseHealth} disabled={loading}>
             <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
@@ -104,12 +101,11 @@ export default function DatabaseHealthPage() {
 
         {health && (
           <div className="space-y-6">
-            {/* Database Connection */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Database className="h-5 w-5" />
-                  Database Connection
+                  MongoDB Connection
                   {getStatusBadge(health.connection.success)}
                 </CardTitle>
                 <CardDescription>Connection status and database information</CardDescription>
@@ -125,15 +121,15 @@ export default function DatabaseHealthPage() {
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-gray-50 rounded-lg">
                       <div>
                         <p className="text-sm font-medium text-gray-500">Database</p>
-                        <p className="text-sm">{health.connection.data.info.database}</p>
+                        <p className="text-sm">{health.connection.data.info.database_name}</p>
                       </div>
                       <div>
-                        <p className="text-sm font-medium text-gray-500">User</p>
-                        <p className="text-sm">{health.connection.data.info.user}</p>
+                        <p className="text-sm font-medium text-gray-500">Host</p>
+                        <p className="text-sm">{health.connection.data.info.host}</p>
                       </div>
                       <div>
                         <p className="text-sm font-medium text-gray-500">Version</p>
-                        <p className="text-sm">{health.connection.data.info.version?.split(" ")[0]}</p>
+                        <p className="text-sm">{health.connection.data.info.version}</p>
                       </div>
                     </div>
                   )}
@@ -141,33 +137,30 @@ export default function DatabaseHealthPage() {
               </CardContent>
             </Card>
 
-            {/* Tables Status */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <FileText className="h-5 w-5" />
-                  Tables Status
+                  <Boxes className="h-5 w-5" />
+                  Collections Status
                 </CardTitle>
-                <CardDescription>Status and record counts for all database tables</CardDescription>
+                <CardDescription>Status and document counts for all MongoDB collections</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {Object.entries(health.tables).map(([tableName, tableData]) => (
-                    <div key={tableName} className="p-4 border rounded-lg space-y-2">
+                  {Object.entries(health.collections).map(([collectionName, collectionData]) => (
+                    <div key={collectionName} className="p-4 border rounded-lg space-y-2">
                       <div className="flex items-center justify-between">
-                        <h3 className="font-medium capitalize">{tableName.replace("_", " ")}</h3>
-                        {getStatusIcon(tableData.success)}
+                        <h3 className="font-medium capitalize">{collectionName.replace("_", " ")}</h3>
+                        {getStatusIcon(collectionData.success)}
                       </div>
 
-                      {tableData.success && tableData.data ? (
+                      {collectionData.success && collectionData.data ? (
                         <div className="space-y-1">
-                          <p className="text-2xl font-bold text-blue-600">{tableData.data.count}</p>
-                          <p className="text-sm text-gray-500">records</p>
+                          <p className="text-2xl font-bold text-blue-600">{collectionData.data.count}</p>
+                          <p className="text-sm text-gray-500">documents</p>
                         </div>
                       ) : (
-                        <div className="space-y-1">
-                          <p className="text-sm text-red-600">{tableData.message || "Table check failed"}</p>
-                        </div>
+                        <p className="text-sm text-red-600">{collectionData.message || "Collection check failed"}</p>
                       )}
                     </div>
                   ))}
@@ -175,7 +168,6 @@ export default function DatabaseHealthPage() {
               </CardContent>
             </Card>
 
-            {/* Summary */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -186,23 +178,23 @@ export default function DatabaseHealthPage() {
               <CardContent>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div className="text-center">
-                    <p className="text-2xl font-bold text-blue-600">{health.tables.users?.data?.count || 0}</p>
+                    <p className="text-2xl font-bold text-blue-600">{health.collections.users?.data?.count || 0}</p>
                     <p className="text-sm text-gray-500">Total Users</p>
                   </div>
                   <div className="text-center">
                     <p className="text-2xl font-bold text-green-600">
-                      {health.tables.faculty_profiles?.data?.count || 0}
+                      {health.collections.faculty_profiles?.data?.count || 0}
                     </p>
                     <p className="text-sm text-gray-500">Faculty</p>
                   </div>
                   <div className="text-center">
                     <p className="text-2xl font-bold text-purple-600">
-                      {health.tables.student_profiles?.data?.count || 0}
+                      {health.collections.student_profiles?.data?.count || 0}
                     </p>
                     <p className="text-sm text-gray-500">Students</p>
                   </div>
                   <div className="text-center">
-                    <p className="text-2xl font-bold text-orange-600">{health.tables.projects?.data?.count || 0}</p>
+                    <p className="text-2xl font-bold text-orange-600">{health.collections.projects?.data?.count || 0}</p>
                     <p className="text-sm text-gray-500">Projects</p>
                   </div>
                 </div>

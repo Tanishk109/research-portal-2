@@ -13,19 +13,25 @@ export interface ApiResponse<T = any> {
 // Create standardized API response
 export function createApiResponse<T>(
   success: boolean,
-  data?: T,
-  message?: string,
-  error?: string,
+  dataOrMessage?: T | string | null,
+  messageOrData?: string | T | null,
+  errorOrStatus?: string | number,
 ): NextResponse<ApiResponse<T>> {
+  const calledWithMessageFirst = typeof dataOrMessage === "string"
+  const data = (calledWithMessageFirst ? messageOrData : dataOrMessage) as T | null | undefined
+  const message = calledWithMessageFirst ? dataOrMessage : typeof messageOrData === "string" ? messageOrData : undefined
+  const error = typeof errorOrStatus === "string" ? errorOrStatus : undefined
+  const status = typeof errorOrStatus === "number" ? errorOrStatus : success ? 200 : 400
+
   const response: ApiResponse<T> = {
     success,
-    ...(data !== undefined && { data }),
+    ...(data !== undefined && data !== null && { data }),
     ...(message && { message }),
     ...(error && { error }),
   }
 
   return NextResponse.json(response, {
-    status: success ? 200 : 400,
+    status,
     headers: {
       "Content-Type": "application/json",
     },

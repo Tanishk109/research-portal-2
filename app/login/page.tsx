@@ -19,7 +19,7 @@ import { api, endpoints, getClientIpAddress } from "@/lib/api-client"
 export default function LoginPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const defaultRole = searchParams.get("role") || "faculty"
+  const defaultRole = searchParams?.get("role") || "faculty"
   const [isLoading, setIsLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [activeTab, setActiveTab] = useState(defaultRole)

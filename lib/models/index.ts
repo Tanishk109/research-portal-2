@@ -90,7 +90,7 @@ export interface IStudentCV {
 const StudentCVSchema = new Schema<IStudentCV>(
   {
     user_id: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
-    file_url: { type: String, required: true, maxlength: 255 },
+    file_url: { type: String, required: true },
     uploaded_at: { type: Date, default: Date.now },
   }
 );
@@ -111,7 +111,7 @@ const StudentCertificateSchema = new Schema<IStudentCertificate>(
     user_id: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
     name: { type: String, required: true, maxlength: 255 },
     type: { type: String, maxlength: 100 },
-    file_url: { type: String, required: true, maxlength: 255 },
+    file_url: { type: String, required: true },
     date: { type: Date },
     uploaded_at: { type: Date, default: Date.now },
   }
@@ -142,7 +142,7 @@ export interface IProject {
   requirements?: string;
   duration?: string;
   stipend?: string;
-  status: "active" | "inactive" | "completed";
+  status: "draft" | "active" | "closed" | "completed" | "inactive";
   max_students?: number;
   research_area?: string;
   positions?: number;
@@ -164,7 +164,7 @@ const ProjectSchema = new Schema<IProject>(
     requirements: { type: String },
     duration: { type: String, maxlength: 100 },
     stipend: { type: String, maxlength: 100 },
-    status: { type: String, enum: ["active", "inactive", "completed"], default: "active", index: true },
+    status: { type: String, enum: ["draft", "active", "closed", "completed", "inactive"], default: "active", index: true },
     max_students: { type: Number, default: 1 },
     research_area: { type: String },
     positions: { type: Number },
@@ -236,6 +236,25 @@ const LoginActivitySchema = new Schema<ILoginActivity>(
   }
 );
 
+// Admin test entry schema used by the database operations page
+export interface ITestEntry {
+  _id?: string;
+  title: string;
+  description?: string;
+  created_at?: Date;
+  updated_at?: Date;
+}
+
+const TestEntrySchema = new Schema<ITestEntry>(
+  {
+    title: { type: String, required: true, maxlength: 255 },
+    description: { type: String },
+    created_at: { type: Date, default: Date.now },
+    updated_at: { type: Date, default: Date.now },
+  },
+  { timestamps: { createdAt: "created_at", updatedAt: "updated_at" } }
+);
+
 // Create models (use existing if already compiled)
 export const User = (mongoose.models.User as Model<IUser>) || mongoose.model<IUser>("User", UserSchema);
 export const FacultyProfile = (mongoose.models.FacultyProfile as Model<IFacultyProfile>) || mongoose.model<IFacultyProfile>("FacultyProfile", FacultyProfileSchema);
@@ -246,4 +265,4 @@ export const StudentSkill = (mongoose.models.StudentSkill as Model<IStudentSkill
 export const Project = (mongoose.models.Project as Model<IProject>) || mongoose.model<IProject>("Project", ProjectSchema);
 export const Application = (mongoose.models.Application as Model<IApplication>) || mongoose.model<IApplication>("Application", ApplicationSchema);
 export const LoginActivity = (mongoose.models.LoginActivity as Model<ILoginActivity>) || mongoose.model<ILoginActivity>("LoginActivity", LoginActivitySchema);
-
+export const TestEntry = (mongoose.models.TestEntry as Model<ITestEntry>) || mongoose.model<ITestEntry>("TestEntry", TestEntrySchema);

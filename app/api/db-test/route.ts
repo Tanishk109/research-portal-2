@@ -1,7 +1,8 @@
 import type { NextRequest } from "next/server"
-import { sql, testDatabaseConnection, getDatabaseInfo } from "@/lib/db"
+import { testDatabaseConnection, getDatabaseInfo } from "@/lib/db"
 import { createApiResponse, handleApiError } from "@/lib/api-utils"
 import { cache } from '@/lib/cache'
+import { Application, FacultyProfile, LoginActivity, Project, StudentProfile, User } from "@/lib/models"
 
 // GET /api/db-test - Test database connection
 export async function GET() {
@@ -13,7 +14,7 @@ export async function GET() {
       return createApiResponse(true, "Database connection successful (cached)", cached)
     }
 
-    console.log("Testing MySQL database connection...")
+    console.log("Testing MongoDB database connection...")
 
     // Test basic connection
     const isConnected = await testDatabaseConnection()
@@ -25,115 +26,85 @@ export async function GET() {
     // Get database info
     const dbInfo = await getDatabaseInfo()
 
-    // Test table existence
-    const tableChecks = await checkTables()
+    const collectionChecks = await checkCollections()
 
-    console.log("MySQL database connection successful:", dbInfo)
+    console.log("MongoDB database connection successful:", dbInfo)
 
     const result = {
       info: dbInfo,
       status: "connected",
-      tables: tableChecks,
+      collections: collectionChecks,
       timestamp: new Date().toISOString(),
     }
     cache.set(cacheKey, result, 30)
     return createApiResponse(true, "Database connection successful", result)
   } catch (error) {
-    console.error("MySQL database connection failed:", error)
+    console.error("MongoDB database connection failed:", error)
     return handleApiError(error, "Database connection failed")
   }
 }
 
-// POST /api/db-test - Test specific table
+// POST /api/db-test - Test specific MongoDB collection
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { table } = body
+    const collection = body.collection || body.table
 
-    if (!table) {
-      return createApiResponse(false, "Table name is required", null, 400)
+    if (!collection) {
+      return createApiResponse(false, "Collection name is required", null, 400)
     }
 
-    console.log(`Testing table: ${table}`)
+    console.log(`Testing collection: ${collection}`)
 
-    // Check if table exists first
-    const tableExists = await sql`
-      SELECT COUNT(*) as table_exists 
-      FROM information_schema.tables 
-      WHERE table_schema = DATABASE() 
-      AND table_name = ?
-    `
+    const model = getModelForCollection(collection)
 
-    if (tableExists[0].table_exists === 0) {
-      return createApiResponse(false, `Table '${table}' does not exist`, {
-        table,
+    if (!model) {
+      return createApiResponse(false, `Collection '${collection}' does not exist`, {
+        collection,
         exists: false,
         count: 0,
       })
     }
 
-    // Get record count
-    const result = await sql.unsafe(`SELECT COUNT(*) as count FROM ${table}`)
-    const count = Number(result[0].count)
+    const count = await model.countDocuments()
 
-    console.log(`Table ${table} exists with ${count} records`)
+    console.log(`Collection ${collection} exists with ${count} documents`)
 
-    return createApiResponse(true, `Table ${table} is accessible`, {
-      table,
+    return createApiResponse(true, `Collection ${collection} is accessible`, {
+      collection,
       count,
       exists: true,
     })
   } catch (error) {
-    console.error(`Table test failed:`, error)
-
-    // Check if it's a table not found error
-    if (
-      error instanceof Error &&
-      (error.message.includes("doesn't exist") ||
-        (error.message.includes("Table") && error.message.includes("doesn't exist")))
-    ) {
-      return createApiResponse(false, `Table does not exist`, {
-        exists: false,
-      })
-    }
-
-    return handleApiError(error, "Table test failed")
+    console.error(`Collection test failed:`, error)
+    return handleApiError(error, "Collection test failed")
   }
 }
 
-// Helper function to check all required tables
-async function checkTables() {
-  const requiredTables = ["users", "faculty_profiles", "student_profiles", "projects", "applications", "login_activity"]
+async function checkCollections() {
+  const requiredCollections = ["users", "faculty_profiles", "student_profiles", "projects", "applications", "login_activity"]
 
-  const tableStatus: Record<string, any> = {}
+  const collectionStatus: Record<string, any> = {}
 
-  for (const table of requiredTables) {
+  for (const collection of requiredCollections) {
     try {
-      // Check if table exists
-      const exists = await sql`
-        SELECT COUNT(*) as table_exists 
-        FROM information_schema.tables 
-        WHERE table_schema = DATABASE() 
-        AND table_name = ?
-      `
-
-      if (exists[0].table_exists > 0) {
-        // Get record count
-        const count = await sql.unsafe(`SELECT COUNT(*) as count FROM ${table}`)
-        tableStatus[table] = {
+      const model = getModelForCollection(collection)
+      if (model) {
+        const count = await model.countDocuments()
+        collectionStatus[collection] = {
           exists: true,
-          count: Number(count[0].count),
+          count,
           status: "ok",
         }
       } else {
-        tableStatus[table] = {
+        collectionStatus[collection] = {
           exists: false,
           count: 0,
           status: "missing",
         }
       }
     } catch (error) {
-      tableStatus[table] = {
+      collectionStatus[collection] = {
         exists: false,
         count: 0,
         status: "error",
@@ -142,5 +113,18 @@ async function checkTables() {
     }
   }
 
-  return tableStatus
+  return collectionStatus
+}
+
+function getModelForCollection(collection: string) {
+  const models: Record<string, { countDocuments: () => Promise<number> }> = {
+    users: User,
+    faculty_profiles: FacultyProfile,
+    student_profiles: StudentProfile,
+    projects: Project,
+    applications: Application,
+    login_activity: LoginActivity,
+  }
+
+  return models[collection]
 }

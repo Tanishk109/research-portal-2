@@ -4,18 +4,14 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { BookOpen, Calendar, Clock, Users, ArrowLeft, Share2 } from "lucide-react"
+import { BookOpen, Calendar, Clock, Users, ArrowLeft } from "lucide-react"
 import { Separator } from "@/components/ui/separator"
 import { getProjectById } from "@/app/actions/projects"
+import { ShareButton } from "@/components/share-button"
 
-export default async function ProjectDetailPage({ params }: { params: { id: string } }) {
-  const projectId = Number.parseInt(params.id)
-
-  if (isNaN(projectId)) {
-    notFound()
-  }
-
-  const project = await getProjectById(projectId)
+export default async function ProjectDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
+  const project = await getProjectById(id)
 
   if (!project) {
     notFound()
@@ -72,9 +68,7 @@ export default async function ProjectDetailPage({ params }: { params: { id: stri
                 </div>
               </div>
               <div className="flex gap-2">
-                <Button variant="outline" size="icon">
-                  <Share2 className="h-4 w-4" />
-                </Button>
+                <ShareButton title={project.title} />
                 <Link href={`/projects/${project.id}/apply`}>
                   <Button>Apply Now</Button>
                 </Link>
@@ -91,7 +85,7 @@ export default async function ProjectDetailPage({ params }: { params: { id: stri
                 <CardContent className="space-y-4">
                   <p>{project.description}</p>
                   <div className="flex flex-wrap gap-2 pt-2">
-                    {(typeof project.tags === 'string' ? project.tags.split(',') : project.tags || []).map((tag, i) => (
+                    {(Array.isArray(project.tags) ? project.tags : typeof project.tags === "string" ? project.tags.split(",") : []).map((tag: string, i: number) => (
                       <Badge key={i} variant="secondary">
                         {tag.trim()}
                       </Badge>
@@ -107,7 +101,7 @@ export default async function ProjectDetailPage({ params }: { params: { id: stri
                 <CardContent>
                   <div className="space-y-4">
                     {project.long_description ? (
-                      project.long_description.split("\n\n").map((paragraph, i) => <p key={i}>{paragraph}</p>)
+                      project.long_description.split("\n\n").map((paragraph: string, i: number) => <p key={i}>{paragraph}</p>)
                     ) : (
                       <p>{project.description}</p>
                     )}
@@ -200,18 +194,18 @@ export default async function ProjectDetailPage({ params }: { params: { id: stri
                       <AvatarFallback>
                         {project.faculty_name
                           .split(" ")
-                          .map((n) => n[0])
+                          .map((n: string) => n[0])
                           .join("")}
                       </AvatarFallback>
                     </Avatar>
                     <h3 className="font-bold text-lg">{project.faculty_name}</h3>
-                    <p className="text-muted-foreground">{project.faculty_department}</p>
-                    <p className="text-sm mt-1">{project.faculty_specialization}</p>
+                    <p className="text-muted-foreground">{project.department}</p>
+                    <p className="text-sm mt-1">{project.specialization}</p>
                   </div>
                   <Separator />
                   <p className="text-sm">
                     {project.faculty_bio ||
-                      `Faculty member in the ${project.faculty_department} department specializing in ${project.faculty_specialization}.`}
+                      `Faculty member in the ${project.department} department specializing in ${project.specialization}.`}
                   </p>
                 </CardContent>
                 <CardFooter>

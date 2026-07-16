@@ -5,10 +5,11 @@ import { createApiResponse, handleApiError, parseJsonBody } from "@/lib/api-util
 import { toObjectId, toPlainObject } from "@/lib/db"
 
 // GET /api/users/[id] - Get a specific user
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     await connectToMongoDB()
-    const userId = toObjectId(params.id)
+    const { id } = await params
+    const userId = toObjectId(id)
 
     if (!userId) {
       return createApiResponse(false, "Invalid user ID")
@@ -41,10 +42,11 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 }
 
 // PUT /api/users/[id] - Update a user
-export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     await connectToMongoDB()
-    const userId = toObjectId(params.id)
+    const { id } = await params
+    const userId = toObjectId(id)
 
     if (!userId) {
       return createApiResponse(false, "Invalid user ID")
@@ -121,10 +123,11 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
 }
 
 // DELETE /api/users/[id] - Delete a user
-export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     await connectToMongoDB()
-    const userId = toObjectId(params.id)
+    const { id } = await params
+    const userId = toObjectId(id)
 
     if (!userId) {
       return createApiResponse(false, "Invalid user ID")

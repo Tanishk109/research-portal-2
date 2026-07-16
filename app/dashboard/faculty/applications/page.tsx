@@ -310,9 +310,7 @@ export default function FacultyApplicationsPage() {
                       </div>
                       <Badge
                         variant={
-                          application.status === "approved"
-                            ? "success"
-                            : application.status === "rejected"
+                          application.status === "rejected"
                               ? "destructive"
                               : "outline"
                         }

@@ -1,13 +1,15 @@
 import type { NextRequest } from "next/server"
-import { sql } from "@/lib/db"
 import { createApiResponse, handleApiError } from "@/lib/api-utils"
 import { hashPassword } from "@/lib/db"
+import { connectToMongoDB } from "@/lib/mongodb"
+import { FacultyProfile, StudentProfile, User } from "@/lib/models"
 
 // POST /api/registration-test - Create test user
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
     const { role, email } = body
+    await connectToMongoDB()
 
     console.log(`Creating test ${role} user...`)
 
@@ -45,56 +47,41 @@ export async function POST(request: NextRequest) {
             cgpa: 8.5,
           }
 
-    // Insert user and profile in transaction
-    const result = await sql.begin(async (sql: any) => {
-      // Insert user
-      const users = await sql`
-        INSERT INTO users (
-          role, first_name, last_name, email, password_hash, created_at, updated_at
-        ) VALUES (
-          ${testData.role}, ${testData.firstName}, ${testData.lastName}, 
-          ${testData.email}, ${testData.password_hash}, 
-          CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
-        ) RETURNING id, role, first_name, last_name, email, created_at
-      `
-
-      const user = users[0]
-
-      // Insert role-specific profile
-      if (role === "faculty") {
-        await sql`
-          INSERT INTO faculty_profiles (
-            user_id, faculty_id, department, specialization, 
-            date_of_joining, date_of_birth, created_at, updated_at
-          ) VALUES (
-            ${user.id}, ${testData.facultyId}, ${testData.department}, 
-            ${testData.specialization}, ${testData.dateOfJoining}, 
-            ${testData.dateOfBirth}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
-          )
-        `
-      } else {
-        await sql`
-          INSERT INTO student_profiles (
-            user_id, registration_number, department, year, cgpa, 
-            created_at, updated_at
-          ) VALUES (
-            ${user.id}, ${testData.registrationNumber}, ${testData.department}, 
-            ${testData.year}, ${testData.cgpa}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
-          )
-        `
-      }
-
-      return user
+    const user = await User.create({
+      role: testData.role as "faculty" | "student",
+      first_name: testData.firstName,
+      last_name: testData.lastName,
+      email: testData.email,
+      password_hash: testData.password_hash,
     })
 
-    console.log(`Test ${role} user created successfully:`, result.email)
+    if (role === "faculty" && "facultyId" in testData) {
+      await FacultyProfile.create({
+        user_id: user._id,
+        faculty_id: testData.facultyId,
+        department: testData.department,
+        specialization: testData.specialization,
+        date_of_joining: new Date(testData.dateOfJoining || "2023-01-01"),
+        date_of_birth: new Date(testData.dateOfBirth || "1980-01-01"),
+      })
+    } else if ("registrationNumber" in testData) {
+      await StudentProfile.create({
+        user_id: user._id,
+        registration_number: testData.registrationNumber,
+        department: testData.department,
+        year: testData.year,
+        cgpa: testData.cgpa,
+      })
+    }
+
+    console.log(`Test ${role} user created successfully:`, user.email)
 
     return createApiResponse(true, `Test ${role} user created successfully`, {
       user: {
-        id: result.id,
-        role: result.role,
-        email: result.email,
-        name: `${result.first_name} ${result.last_name}`,
+        id: user._id.toString(),
+        role: user.role,
+        email: user.email,
+        name: `${user.first_name} ${user.last_name}`,
         password: password, // Include for testing purposes
       },
     })

@@ -3,11 +3,6 @@ import bcrypt from "bcryptjs";
 import { ObjectId } from "mongodb";
 import mongoose from "mongoose";
 
-// Initialize MongoDB connection on import
-if (typeof window === "undefined") {
-  connectToMongoDB().catch(console.error);
-}
-
 // Password utilities (unchanged)
 export async function hashPassword(password: string): Promise<string> {
   try {
@@ -63,22 +58,6 @@ export async function closeDatabaseConnection(): Promise<void> {
   const { disconnectFromMongoDB } = await import("./mongodb");
   await disconnectFromMongoDB();
 }
-
-// SQL-like interface for compatibility
-// This provides a compatibility layer for existing code
-export function sql(strings: TemplateStringsArray, ...values: any[]): Promise<any[]> {
-  throw new Error(
-    "SQL queries are not supported with MongoDB. Please use Mongoose models directly. " +
-    "Import models from '@/lib/models' and use them instead of sql template literals."
-  );
-}
-
-// Add unsafe method for dynamic queries (not supported)
-sql.unsafe = (query: string, params: any[] = []) => {
-  throw new Error(
-    "SQL queries are not supported with MongoDB. Please use Mongoose models directly."
-  );
-};
 
 // Helper function to convert MongoDB ObjectId to string or number
 export function toId(value: string | ObjectId | number | undefined): string | number | undefined {
@@ -187,22 +166,4 @@ function convertObjectIds(obj: any): any {
   }
   
   return result;
-}
-
-// Export getPool for compatibility (returns MongoDB connection)
-export function getPool() {
-  return {
-    execute: async (query: string, params: any[]) => {
-      throw new Error("SQL queries not supported. Use Mongoose models instead.");
-    },
-    getConnection: async () => {
-      await connectToMongoDB();
-      return {
-        execute: async (query: string, params: any[]) => {
-          throw new Error("SQL queries not supported. Use Mongoose models instead.");
-        },
-        release: () => {},
-      };
-    },
-  };
 }

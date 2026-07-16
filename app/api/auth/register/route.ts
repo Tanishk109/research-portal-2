@@ -40,6 +40,7 @@ export async function POST(request: NextRequest) {
     } = body
 
     console.log(`Registration attempt for: ${email}, role: ${role}`)
+    const normalizedEmail = email.toLowerCase()
 
     // Validate required fields
     if (!role || !firstName || !lastName || !email || !password) {
@@ -90,7 +91,7 @@ export async function POST(request: NextRequest) {
     // Check if email already exists (case-insensitive)
     console.log("Checking if email already exists...")
     const existingUser = await User.findOne({
-      email: { $regex: new RegExp(`^${email.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }
+      email: { $regex: new RegExp(`^${normalizedEmail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }
     })
 
     if (existingUser) {
@@ -104,54 +105,103 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    if (role === "faculty") {
+      const existingFacultyProfile = await FacultyProfile.findOne({ faculty_id: facultyId })
+      if (existingFacultyProfile) {
+        return NextResponse.json(
+          { success: false, message: "Faculty ID is already registered" },
+          { status: 400 }
+        )
+      }
+    } else if (role === "student") {
+      const existingStudentProfile = await StudentProfile.findOne({ registration_number: registrationNumber })
+      if (existingStudentProfile) {
+        return NextResponse.json(
+          { success: false, message: "Registration number is already registered" },
+          { status: 400 }
+        )
+      }
+    }
+
     // Hash password
     console.log("Hashing password...")
     const hashedPassword = await hashPassword(password)
 
-    // Create user
-    console.log("Inserting user...")
-    const user = await User.create({
-      role: role as "faculty" | "student",
-      first_name: firstName,
-      last_name: lastName,
-      email: email.toLowerCase(), // Store email in lowercase for consistency
-      password_hash: hashedPassword,
-    })
+    const session = await User.startSession()
+    let user: any = null
 
-    console.log(`User created with ID: ${user._id}`)
+    try {
+      await session.withTransaction(async () => {
+        console.log("Inserting user...")
+        const users = await User.create(
+          [
+            {
+              role: role as "faculty" | "student",
+              first_name: firstName,
+              last_name: lastName,
+              email: normalizedEmail,
+              password_hash: hashedPassword,
+            },
+          ],
+          { session }
+        )
+        user = users[0]
 
-    // Create role-specific profile
-    if (role === "faculty") {
-      console.log("Creating faculty profile...")
-      await FacultyProfile.create({
-        user_id: user._id,
-        faculty_id: facultyId,
-        department,
-        specialization,
-        date_of_joining: new Date(dateOfJoining),
-        date_of_birth: new Date(dateOfBirth),
+        console.log(`User created with ID: ${user._id}`)
+
+        if (role === "faculty") {
+          console.log("Creating faculty profile...")
+          await FacultyProfile.create(
+            [
+              {
+                user_id: user._id,
+                faculty_id: facultyId,
+                department,
+                specialization,
+                date_of_joining: new Date(dateOfJoining),
+                date_of_birth: new Date(dateOfBirth),
+              },
+            ],
+            { session }
+          )
+        } else {
+          console.log("Creating student profile...")
+          await StudentProfile.create(
+            [
+              {
+                user_id: user._id,
+                registration_number: registrationNumber,
+                department,
+                year,
+                cgpa: Number.parseFloat(cgpa),
+              },
+            ],
+            { session }
+          )
+        }
+
+        console.log("Recording login activity...")
+        await LoginActivity.create(
+          [
+            {
+              user_id: user._id,
+              timestamp: new Date(),
+              ip_address: ipAddress || "unknown",
+              user_agent: userAgent || "unknown",
+              success: true,
+              device_type: "Web",
+            },
+          ],
+          { session }
+        )
       })
-    } else if (role === "student") {
-      console.log("Creating student profile...")
-      await StudentProfile.create({
-        user_id: user._id,
-        registration_number: registrationNumber,
-        department,
-        year,
-        cgpa: Number.parseFloat(cgpa),
-      })
+    } finally {
+      await session.endSession()
     }
 
-    // Record login activity
-    console.log("Recording login activity...")
-    await LoginActivity.create({
-      user_id: user._id,
-      timestamp: new Date(),
-      ip_address: ipAddress || "unknown",
-      user_agent: userAgent || "unknown",
-      success: true,
-      device_type: "Web",
-    })
+    if (!user) {
+      throw new Error("User creation failed")
+    }
 
     console.log("Transaction completed successfully")
 
@@ -171,7 +221,8 @@ export async function POST(request: NextRequest) {
 
     // Set cookie
     console.log("Setting session cookie...")
-    cookies().set("session", token, COOKIE_SETTINGS)
+    const cookieStore = await cookies()
+    cookieStore.set("session", token, COOKIE_SETTINGS)
 
     console.log(`Registration successful for user: ${user._id}`)
 

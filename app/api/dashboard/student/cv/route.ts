@@ -82,3 +82,26 @@ export async function POST(request: Request) {
   }
 }
 
+// DELETE /api/dashboard/student/cv - Delete CV for current user
+export async function DELETE() {
+  try {
+    await connectToMongoDB()
+    const userResult = await getCurrentUser()
+
+    if (!userResult.success || !userResult.user) {
+      return NextResponse.json({ success: false, message: "Not authenticated" }, { status: 401 })
+    }
+
+    const userId = toObjectId(userResult.user.id)
+    if (!userId) {
+      return NextResponse.json({ success: false, message: "Invalid user ID" }, { status: 400 })
+    }
+
+    await StudentCV.deleteOne({ user_id: userId })
+
+    return NextResponse.json({ success: true, message: "CV removed successfully" })
+  } catch (error) {
+    console.error("Error deleting CV:", error)
+    return NextResponse.json({ success: false, message: "Failed to remove CV" }, { status: 500 })
+  }
+}

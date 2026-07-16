@@ -10,13 +10,14 @@ export const dynamic = 'force-dynamic'
 // GET /api/auth/me - Get current user info
 export async function GET(request: NextRequest) {
   try {
-    await connectToMongoDB()
     const userId = getUserIdFromRequest(request)
     const userRole = getUserRoleFromRequest(request)
 
     if (!userId) {
       return createApiResponse(false, "User not authenticated", null, 401)
     }
+
+    await connectToMongoDB()
 
     console.log(`Getting user info for ID: ${userId}, Role: ${userRole}`)
 

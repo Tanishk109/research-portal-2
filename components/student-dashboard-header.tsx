@@ -44,7 +44,7 @@ const StudentDashboardHeader = React.memo(({ user }: StudentDashboardHeaderProps
   const router = useRouter()
 
   const isActive = (path: string) => {
-    return pathname === path || pathname.startsWith(`${path}/`)
+    return pathname === path || pathname?.startsWith(`${path}/`)
   }
 
   const handleLogout = async () => {

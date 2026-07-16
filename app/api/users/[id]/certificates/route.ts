@@ -2,13 +2,14 @@ import type { NextRequest } from "next/server"
 import { connectToMongoDB } from "@/lib/mongodb"
 import { StudentCertificate } from "@/lib/models"
 import { createApiResponse, handleApiError, parseJsonBody } from "@/lib/api-utils"
-import { toObjectId, toPlainObject } from "@/lib/db"
+import { toObjectId } from "@/lib/db"
 
 // POST /api/users/[id]/certificates - Save certificate metadata for a user
-export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     await connectToMongoDB()
-    const userId = toObjectId(params.id)
+    const { id } = await params
+    const userId = toObjectId(id)
     if (!userId) {
       return createApiResponse(false, "Invalid user ID")
     }
@@ -33,10 +34,11 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 }
 
 // GET /api/users/[id]/certificates - Get all certificates for a user
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     await connectToMongoDB()
-    const userId = toObjectId(params.id)
+    const { id } = await params
+    const userId = toObjectId(id)
     if (!userId) {
       return createApiResponse(false, "Invalid user ID")
     }

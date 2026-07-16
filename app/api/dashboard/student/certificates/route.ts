@@ -100,7 +100,7 @@ export async function DELETE(request: Request) {
     }
 
     // Verify the certificate belongs to the user
-    const certificate = await StudentCertificate.findOne({ _id: certObjectId, user_id: userId })
+    const certificate = await StudentCertificate.findOne({ _id: certObjectId, user_id: userId } as any)
     if (!certificate) {
       return NextResponse.json({ success: false, message: "Certificate not found" }, { status: 404 })
     }
@@ -113,4 +113,3 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ success: false, message: "Failed to delete certificate" }, { status: 500 })
   }
 }
-

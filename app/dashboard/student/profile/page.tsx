@@ -23,6 +23,16 @@ import { useToast } from "@/hooks/use-toast"
 const StudentDashboardHeader = dynamic(() => import("@/components/student-dashboard-header"), { ssr: false })
 
 const fetcher = (url: string) => fetch(url).then(res => res.json())
+const MAX_UPLOAD_BYTES = 5 * 1024 * 1024
+
+function readFileAsDataUrl(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(String(reader.result))
+    reader.onerror = () => reject(reader.error)
+    reader.readAsDataURL(file)
+  })
+}
 
 export default function StudentProfilePage() {
   const { toast } = useToast()
@@ -176,14 +186,21 @@ export default function StudentProfilePage() {
   const handleCVUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0]
+
+      if (file.size > MAX_UPLOAD_BYTES) {
+        toast({
+          title: "File too large",
+          description: "Please upload a CV up to 5MB.",
+          variant: "destructive",
+        })
+        return
+      }
+
       setUploadedCV(file)
-      
-      // For now, we'll save a placeholder URL. In production, you'd upload to a file storage service
-      // and get the actual URL
-      const fileUrl = `/uploads/cv/${file.name}`
       
       setSavingCV(true)
       try {
+        const fileUrl = await readFileAsDataUrl(file)
         const res = await fetch("/api/dashboard/student/cv", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -220,11 +237,21 @@ export default function StudentProfilePage() {
   const handleCertificateUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0]
+
+      if (file.size > MAX_UPLOAD_BYTES) {
+        toast({
+          title: "File too large",
+          description: "Please upload a certificate up to 5MB.",
+          variant: "destructive",
+        })
+        return
+      }
+
       const fileName = file.name.replace(/\.[^/.]+$/, "")
-      const fileUrl = `/uploads/certificates/${file.name}`
       
       setSavingCertificates(true)
       try {
+        const fileUrl = await readFileAsDataUrl(file)
         const res = await fetch("/api/dashboard/student/certificates", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -255,6 +282,50 @@ export default function StudentProfilePage() {
       } finally {
         setSavingCertificates(false)
       }
+    }
+  }
+
+  const viewStoredFile = (fileUrl?: string) => {
+    if (!fileUrl) {
+      toast({
+        title: "File unavailable",
+        description: "No uploaded file is attached to this record.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    window.open(fileUrl, "_blank", "noopener,noreferrer")
+  }
+
+  const removeCV = async () => {
+    try {
+      const res = await fetch("/api/dashboard/student/cv", {
+        method: "DELETE",
+      })
+      const result = await res.json()
+
+      if (res.ok && result.success) {
+        setUploadedCV(null)
+        setCvData(null)
+        toast({
+          title: "Success",
+          description: "CV removed successfully",
+        })
+      } else {
+        toast({
+          title: "Error",
+          description: result.message || "Failed to remove CV",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("Error removing CV:", error)
+      toast({
+        title: "Error",
+        description: "Failed to remove CV",
+        variant: "destructive",
+      })
     }
   }
 
@@ -537,7 +608,7 @@ export default function StudentProfilePage() {
                       <div className="flex items-center gap-3">
                         <FileText className="h-8 w-8 text-primary" />
                         <div>
-                          <p className="font-medium">{uploadedCV?.name || cvData?.file_url?.split('/').pop() || "CV"}</p>
+                          <p className="font-medium">{uploadedCV?.name || "Uploaded CV"}</p>
                           <p className="text-sm text-muted-foreground">
                             {uploadedCV ? `${(uploadedCV.size / 1024 / 1024).toFixed(2)} MB • ` : ""}
                             Uploaded on{" "}
@@ -546,18 +617,14 @@ export default function StudentProfilePage() {
                         </div>
                       </div>
                       <div className="flex gap-2">
-                        <Button variant="outline" size="sm">
+                        <Button variant="outline" size="sm" onClick={() => viewStoredFile(cvData?.file_url)}>
                           View
                         </Button>
                         <Button
                           variant="outline"
                           size="sm"
                           className="text-red-500 hover:text-red-700"
-                          onClick={async () => {
-                            setUploadedCV(null)
-                            setCvData(null)
-                            // Optionally delete from database
-                          }}
+                          onClick={removeCV}
                         >
                           Remove
                         </Button>
@@ -630,7 +697,7 @@ export default function StudentProfilePage() {
                           </div>
                         </div>
                         <div className="flex gap-2">
-                          <Button variant="outline" size="sm">
+                          <Button variant="outline" size="sm" onClick={() => viewStoredFile(cert.file_url)}>
                             View
                           </Button>
                           <Button

@@ -26,9 +26,9 @@ export default function TestFullFlowPage() {
       status: "pending",
     },
     {
-      id: "table-check",
-      name: "Table Verification",
-      description: "Verify all required tables exist",
+      id: "collection-check",
+      name: "Collection Verification",
+      description: "Verify all required MongoDB collections are accessible",
       status: "pending",
     },
     {
@@ -107,24 +107,24 @@ export default function TestFullFlowPage() {
     return data.data
   }
 
-  const testTableVerification = async () => {
-    const tables = ["users", "faculty_profiles", "student_profiles", "login_activity"]
-    const results = {}
+  const testCollectionVerification = async () => {
+    const collections = ["users", "faculty_profiles", "student_profiles", "login_activity"]
+    const results: Record<string, unknown> = {}
 
-    for (const table of tables) {
+    for (const collection of collections) {
       const response = await fetch("/api/db-test", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ table }),
+        body: JSON.stringify({ collection }),
       })
 
       const data = await response.json()
 
       if (!data.success) {
-        throw new Error(`Table ${table} verification failed: ${data.message}`)
+        throw new Error(`Collection ${collection} verification failed: ${data.message}`)
       }
 
-      results[table] = data.data
+      results[collection] = data.data
     }
 
     return results
@@ -283,9 +283,9 @@ export default function TestFullFlowPage() {
       setCurrentStepIndex(0)
       await runStep("db-connection", testDatabaseConnection)
 
-      // Step 2: Table Verification
+      // Step 2: Collection Verification
       setCurrentStepIndex(1)
-      await runStep("table-check", testTableVerification)
+      await runStep("collection-check", testCollectionVerification)
 
       // Step 3: Create Test Users
       setCurrentStepIndex(2)

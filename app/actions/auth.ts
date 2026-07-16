@@ -91,7 +91,8 @@ export async function login(formData: FormData) {
       .sign(new TextEncoder().encode(JWT_SECRET))
 
     // Set cookie
-    cookies().set("session", token, COOKIE_SETTINGS)
+    const cookieStore = await cookies()
+    cookieStore.set("session", token, COOKIE_SETTINGS)
 
     return {
       success: true,
@@ -257,7 +258,8 @@ export async function registerStudent(data: any) {
 // Logout user
 export async function logout() {
   try {
-    cookies().delete("session")
+    const cookieStore = await cookies()
+    cookieStore.delete("session")
     return { success: true, message: "Logout successful" }
   } catch (error) {
     console.error("Logout error:", error)
@@ -273,7 +275,8 @@ export async function getCurrentUser() {
   try {
     await connectToMongoDB()
     
-    const session = cookies().get("session")?.value
+    const cookieStore = await cookies()
+    const session = cookieStore.get("session")?.value
 
     if (!session) {
       return { success: false, message: "Not authenticated" }

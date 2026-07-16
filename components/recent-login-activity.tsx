@@ -22,7 +22,7 @@ export default function RecentLoginActivity({ userRole }: RecentLoginActivityPro
       try {
         const result = await getRecentLoginActivity(5)
         if (result.success) {
-          setActivities(result.activities)
+          setActivities(result.activities || [])
         }
       } catch (error) {
         console.error("Error fetching recent login activity:", error)

@@ -64,7 +64,7 @@ export default function EnvCheck() {
                       </span>
                     ) : (
                       <span className="text-green-500 flex items-center gap-1">
-                        <CheckCircle className="h-4 w-4" /> {value}
+                        <CheckCircle className="h-4 w-4" /> {String(value)}
                       </span>
                     )}
                   </div>

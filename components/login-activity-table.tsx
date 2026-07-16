@@ -22,9 +22,9 @@ export default function LoginActivityTable() {
       try {
         const result = await getLoginActivity(currentPage, 10)
         if (result.success) {
-          setActivities(result.activities)
-          setTotalPages(result.totalPages)
-          setTotalCount(result.totalCount)
+          setActivities(result.activities || [])
+          setTotalPages(result.totalPages || 1)
+          setTotalCount(result.totalCount || 0)
         }
       } catch (error) {
         console.error("Error fetching login activity:", error)

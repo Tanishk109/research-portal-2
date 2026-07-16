@@ -14,7 +14,7 @@ import { ArrowLeft, Calendar, FileText, GraduationCap, User } from "lucide-react
 import FacultyDashboardHeader from "@/components/faculty-dashboard-header"
 
 export default function ApplicationDetailsPage({ params }: { params: { id: string } }) {
-  const id = Number.parseInt(params.id)
+  const id = params.id
   const router = useRouter()
   const { toast } = useToast()
   const [loading, setLoading] = useState(true)
@@ -39,26 +39,11 @@ export default function ApplicationDetailsPage({ params }: { params: { id: strin
         }
 
         const app = result.application
-        // Map status from "accepted" to "approved" for frontend
         const mappedApp = {
           ...app,
           status: app.status === "accepted" ? "approved" : app.status,
-          project: {
-            id: app.project_id,
-            title: app.project_title,
-            description: "",
-            research_area: "",
-            positions: 0,
-            deadline: "",
-          },
-          student: {
-            id: app.student_id,
-            name: app.student_name,
-            registration_number: app.registration_number,
-            department: app.department,
-            year: app.year || "",
-            cgpa: app.cgpa,
-          },
+          project: app.project,
+          student: app.student,
         }
         
         setApplication(mappedApp)
@@ -76,7 +61,7 @@ export default function ApplicationDetailsPage({ params }: { params: { id: strin
     }
 
     if (id) {
-    fetchData()
+      fetchData()
     }
   }, [id, toast])
 
@@ -99,7 +84,7 @@ export default function ApplicationDetailsPage({ params }: { params: { id: strin
         })
 
         // Update local state
-        setApplication((prev) => ({ ...prev, status }))
+        setApplication((prev: any) => ({ ...prev, status }))
 
         // Redirect after a short delay
         setTimeout(() => {
@@ -220,9 +205,7 @@ export default function ApplicationDetailsPage({ params }: { params: { id: strin
                       <p className="text-sm text-muted-foreground">Application Status</p>
                       <Badge
                         variant={
-                          application.status === "approved"
-                            ? "success"
-                            : application.status === "rejected"
+                          application.status === "rejected"
                               ? "destructive"
                               : "outline"
                         }

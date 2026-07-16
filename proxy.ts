@@ -3,7 +3,7 @@ import { jwtVerify } from "jose"
 import { JWT_SECRET } from "@/lib/env"
 
 // Paths that require authentication
-const protectedPaths = ["/dashboard", "/api/auth/me", "/api/users", "/api/projects", "/api/applications"]
+const protectedPaths = ["/dashboard", "/api/auth/me", "/api/users", "/api/projects", "/api/applications", "/api/dashboard"]
 
 // Paths that are public (no authentication required)
 const publicPaths = [
@@ -27,13 +27,20 @@ const roleBasedPaths = {
   student: ["/dashboard/student"],
 }
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  console.log(`Middleware: ${request.method} ${pathname}`)
+  console.log(`Proxy: ${request.method} ${pathname}`)
 
-  // Check if path is public
-  const isPublicPath = publicPaths.some((path) => pathname === path || pathname.startsWith(path))
+  // Project reads are public; writes are still protected by route handlers and auth below.
+  if (request.method === "GET" && pathname.startsWith("/api/projects")) {
+    return NextResponse.next()
+  }
+
+  // Check if path is public. "/" must be exact, otherwise every route matches it.
+  const isPublicPath = publicPaths.some((path) =>
+    path === "/" ? pathname === "/" : pathname === path || pathname.startsWith(`${path}/`),
+  )
 
   if (isPublicPath) {
     console.log(`Public path: ${pathname}`)

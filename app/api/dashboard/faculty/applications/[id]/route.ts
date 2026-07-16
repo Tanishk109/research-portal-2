@@ -1,3 +1,4 @@
+import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { updateApplicationStatus } from "@/app/actions/applications";
 import { connectToMongoDB } from "@/lib/mongodb";
@@ -9,12 +10,13 @@ import { getCurrentUser } from "@/app/actions/auth";
 export const dynamic = 'force-dynamic'
 
 export async function GET(
-  request: Request,
-  { params }: { params: { id: string } }
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     await connectToMongoDB();
-    const id = toObjectId(params.id);
+    const { id: paramId } = await params;
+    const id = toObjectId(paramId);
     if (!id) {
       return NextResponse.json(
         { success: false, message: "Invalid application ID" },
@@ -70,7 +72,7 @@ export async function GET(
         $lookup: {
           from: "studentprofiles",
           localField: "student_id",
-          foreignField: "_id",
+          foreignField: "user_id",
           as: "studentProfile",
         },
       },
@@ -98,7 +100,7 @@ export async function GET(
           positions: "$project.positions",
           deadline: "$project.deadline",
           start_date: "$project.start_date",
-          student_id: { $toString: "$studentProfile._id" },
+          student_id: { $toString: "$user._id" },
           student_name: { $concat: ["$user.first_name", " ", "$user.last_name"] },
           registration_number: "$studentProfile.registration_number",
           year: "$studentProfile.year",
@@ -150,9 +152,10 @@ export async function GET(
   }
 }
 
-export async function PUT(request: Request, { params }: { params: { id: string } }) {
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const id = toObjectId(params.id);
+    const { id: paramId } = await params;
+    const id = toObjectId(paramId);
     if (!id) {
       return NextResponse.json({ success: false, message: "Invalid application ID" }, { status: 400 });
     }

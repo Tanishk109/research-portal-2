@@ -8,11 +8,7 @@ export async function GET() {
       environment: {
         nodeEnv: process.env.NODE_ENV,
         vercel: !!process.env.VERCEL,
-        hasDatabaseUrl: !!process.env.DATABASE_URL,
-        hasDbHost: !!process.env.DB_HOST,
-        hasDbUser: !!process.env.DB_USER,
-        hasDbPassword: !!process.env.DB_PASSWORD,
-        hasDbName: !!process.env.DB_NAME,
+        hasMongoDbUri: !!process.env.MONGODB_URI,
       },
       connection: {
         test: false,
@@ -21,12 +17,9 @@ export async function GET() {
     };
 
     // Mask sensitive info in environment check
-    if (process.env.DATABASE_URL) {
-      const url = new URL(process.env.DATABASE_URL);
-      diagnostics.environment.databaseUrl = `${url.protocol}//${url.hostname}:${url.port}/${url.pathname.replace(/^\//, '')}`;
-    }
-    if (process.env.DB_HOST) {
-      diagnostics.environment.dbHost = process.env.DB_HOST;
+    if (process.env.MONGODB_URI) {
+      const url = new URL(process.env.MONGODB_URI);
+      diagnostics.environment.mongodb = `${url.protocol}//${url.hostname}${url.pathname}`;
     }
 
     // Test connection
@@ -48,7 +41,6 @@ export async function GET() {
         message: error?.message || String(error),
         code: error?.code,
         errno: error?.errno,
-        sqlState: error?.sqlState,
       };
     }
 
@@ -70,4 +62,3 @@ export async function GET() {
     );
   }
 }
-

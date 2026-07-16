@@ -1,37 +1,27 @@
 "use server"
 
-import { sql } from "@/lib/db"
+import { connectToMongoDB, getMongoDBInfo } from "@/lib/mongodb"
+import { Application, FacultyProfile, LoginActivity, Project, StudentProfile, User } from "@/lib/models"
 
 export async function testDatabase() {
   try {
-    console.log("Testing database connection...")
-
-    // Test basic connection
-    const connectionTest = await sql`SELECT 1 as connection_test`
-    if (!connectionTest || connectionTest.length === 0 || connectionTest[0].connection_test !== 1) {
-      return {
-        success: false,
-        message: "Database connection test failed - unexpected response",
-      }
+    await connectToMongoDB()
+    const info = await getMongoDBInfo()
+    const collections = {
+      users: await User.countDocuments(),
+      faculty_profiles: await FacultyProfile.countDocuments(),
+      student_profiles: await StudentProfile.countDocuments(),
+      projects: await Project.countDocuments(),
+      applications: await Application.countDocuments(),
+      login_activity: await LoginActivity.countDocuments(),
     }
-
-    // Get database time to verify connection
-    const timeResult = await sql`SELECT NOW() as current_time`
-
-    // Check if tables exist
-    const tablesExist = await sql`
-      SELECT 
-        (SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'users')) as users_table,
-        (SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'faculty_profiles')) as faculty_profiles_table,
-        (SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'student_profiles')) as student_profiles_table,
-        (SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'login_activity')) as login_activity_table
-    `
 
     return {
       success: true,
-      message: "Database connection successful",
-      currentTime: timeResult[0].current_time,
-      tables: tablesExist[0],
+      message: "MongoDB connection successful",
+      currentTime: info.timestamp,
+      database: info,
+      tables: collections,
     }
   } catch (error) {
     console.error("Database test error:", error)
