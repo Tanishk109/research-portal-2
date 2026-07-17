@@ -4,9 +4,11 @@ import {
   JWT_SECRET,
   JWT_EXPIRATION,
   IS_DB_CONFIGURED,
+  API_URL,
   GOOGLE_CLIENT_ID,
   GOOGLE_REDIRECT_URI,
   IS_GOOGLE_AUTH_CONFIGURED,
+  NEXT_PUBLIC_APP_URL,
 } from "@/lib/env"
 
 export async function GET() {
@@ -26,6 +28,8 @@ export async function GET() {
       JWT_SECRET: maskedJwtSecret,
       JWT_EXPIRATION: JWT_EXPIRATION || "not set",
       IS_DB_CONFIGURED: IS_DB_CONFIGURED,
+      NEXT_PUBLIC_APP_URL: NEXT_PUBLIC_APP_URL || "not configured",
+      API_URL: API_URL || "same origin",
       GOOGLE_CLIENT_ID: GOOGLE_CLIENT_ID ? `${GOOGLE_CLIENT_ID.slice(0, 8)}...` : "Not configured",
       GOOGLE_REDIRECT_URI: GOOGLE_REDIRECT_URI || "Default callback URL",
       IS_GOOGLE_AUTH_CONFIGURED,

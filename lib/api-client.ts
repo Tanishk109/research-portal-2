@@ -17,10 +17,14 @@ interface ApiRequestOptions {
 }
 
 // API request function
+export function getApiUrl(endpoint: string) {
+  return endpoint.startsWith("http") ? endpoint : `${NEXT_PUBLIC_API_URL || ""}${endpoint}`
+}
+
 export async function apiRequest<T = any>(endpoint: string, options: ApiRequestOptions = {}): Promise<ApiResponse<T>> {
   const { method = "GET", headers = {}, body, credentials = "include" } = options
 
-  const url = endpoint.startsWith("http") ? endpoint : `${NEXT_PUBLIC_API_URL}${endpoint}`
+  const url = getApiUrl(endpoint)
 
   try {
     const config: RequestInit = {

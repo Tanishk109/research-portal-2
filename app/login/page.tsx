@@ -14,7 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Eye, EyeOff } from "lucide-react"
 import { toast } from "@/components/ui/use-toast"
 import { AuthBackground } from "@/components/auth-background"
-import { api, endpoints, getClientIpAddress } from "@/lib/api-client"
+import { api, endpoints, getApiUrl, getClientIpAddress } from "@/lib/api-client"
 
 export default function LoginPage() {
   const searchParams = useSearchParams()
@@ -148,7 +148,7 @@ export default function LoginPage() {
     if (redirectTo.startsWith("/") && !redirectTo.startsWith("//")) {
       params.set("redirect", redirectTo)
     }
-    window.location.href = `/api/auth/google/start?${params.toString()}`
+    window.location.href = getApiUrl(`/api/auth/google/start?${params.toString()}`)
   }
 
   const GoogleIcon = () => (
