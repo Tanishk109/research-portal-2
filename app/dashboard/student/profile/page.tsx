@@ -80,16 +80,13 @@ export default function StudentProfilePage() {
       profileData.phone,
       profileData.bio,
       profileData.profilePictureUrl,
+      cvData?.file_url,
+      skills.length > 0 ? "yes" : "",
     ]
 
     const completedRequired = requiredFields.filter((value) => String(value || "").trim().length > 0).length
-    const baseScore = Math.round((completedRequired / requiredFields.length) * 70)
-    const resumeScore = cvData?.file_url ? 10 : 0
-    const certificateScore = certificates.length > 0 ? 10 : 0
-    const skillsScore = skills.length > 0 ? 10 : 0
-
-    return Math.min(100, baseScore + resumeScore + certificateScore + skillsScore)
-  }, [certificates.length, cvData?.file_url, profileData, skills.length])
+    return Math.round((completedRequired / requiredFields.length) * 100)
+  }, [cvData?.file_url, profileData, skills.length])
 
   const loadProfile = async (showLoading = false) => {
     if (showLoading) {

@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
 import Link from "next/link"
-import { BookOpen, ArrowLeft, CheckCircle } from "lucide-react"
+import { BookOpen, ArrowLeft, CheckCircle, AlertCircle } from "lucide-react"
 import { ApplicationForm } from "@/components/application-form"
 import { toast } from "@/components/ui/use-toast"
 import { Button } from "@/components/ui/button"
@@ -16,6 +16,7 @@ export default function ApplyProjectPage() {
   const projectId = params?.id
   const [project, setProject] = useState<any>(null)
   const [alreadyApplied, setAlreadyApplied] = useState(false)
+  const [profileCompletion, setProfileCompletion] = useState<{ complete: boolean; missing: string[] } | null>(null)
   const [loading, setLoading] = useState(true)
 
   // Fetch project details
@@ -27,11 +28,13 @@ export default function ApplyProjectPage() {
       }
 
       try {
-        const [res, applied] = await Promise.all([
+        const [res, applied, completionRes] = await Promise.all([
           fetch(`/api/projects/${projectId}`),
           hasStudentAppliedToProject(projectId),
+          fetch("/api/profile/completion", { cache: "no-store" }),
         ])
         const result = await res.json()
+        const completion = await completionRes.json().catch(() => null)
         
         if (!res.ok || !result.success || !result.project) {
           toast({
@@ -45,6 +48,12 @@ export default function ApplyProjectPage() {
 
         setProject(result.project)
         setAlreadyApplied(applied)
+        if (completionRes.ok && completion?.role === "student") {
+          setProfileCompletion({
+            complete: Boolean(completion.complete),
+            missing: Array.isArray(completion.missing) ? completion.missing : [],
+          })
+        }
       } catch (error) {
         console.error("Error fetching project:", error)
         toast({
@@ -130,7 +139,32 @@ export default function ApplyProjectPage() {
             Back to Project Details
           </Link>
 
-          {alreadyApplied ? (
+          {profileCompletion?.complete === false ? (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <AlertCircle className="h-5 w-5 text-amber-600" />
+                  Complete Your Student Profile
+                </CardTitle>
+                <CardDescription>
+                  Add all required profile details before applying for "{project.title}".
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground">
+                  Missing: {profileCompletion.missing.join(", ")}
+                </p>
+              </CardContent>
+              <CardFooter className="flex flex-col gap-2 sm:flex-row sm:justify-between">
+                <Button variant="outline" asChild>
+                  <Link href={`/projects/${projectId}`}>Back to Project</Link>
+                </Button>
+                <Button asChild>
+                  <Link href="/dashboard/student/profile">Complete Profile</Link>
+                </Button>
+              </CardFooter>
+            </Card>
+          ) : alreadyApplied ? (
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">

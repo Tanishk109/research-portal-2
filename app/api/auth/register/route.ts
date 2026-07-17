@@ -20,6 +20,12 @@ type GoogleRegistrationPayload = {
   role?: "faculty" | "student"
 }
 
+const PENDING_PROFILE_PREFIX = "__pending__"
+
+function getPendingProfileValue(kind: "faculty" | "student", userId: unknown) {
+  return `${PENDING_PROFILE_PREFIX}${kind}_${String(userId)}`
+}
+
 async function getGoogleRegistrationPayload() {
   const cookieStore = await cookies()
   const token = cookieStore.get("google_registration")?.value
@@ -53,16 +59,6 @@ export async function POST(request: NextRequest) {
       lastName,
       email,
       password,
-      // Faculty specific fields
-      facultyId,
-      department,
-      specialization,
-      dateOfJoining,
-      dateOfBirth,
-      // Student specific fields
-      registrationNumber,
-      year,
-      cgpa,
       // Additional fields
       userAgent,
       ipAddress,
@@ -88,30 +84,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Validate role-specific fields
-    if (effectiveRole === "faculty") {
-      if (!facultyId || !department || !specialization || !dateOfJoining || !dateOfBirth) {
-        console.log("Missing faculty-specific fields")
-        return NextResponse.json(
-          {
-            success: false,
-            message: "All faculty fields are required",
-          },
-          { status: 400 }
-        )
-      }
-    } else if (effectiveRole === "student") {
-      if (!registrationNumber || !department || !year || !cgpa) {
-        console.log("Missing student-specific fields")
-        return NextResponse.json(
-          {
-            success: false,
-            message: "All student fields are required",
-          },
-          { status: 400 }
-        )
-      }
-    } else {
+    if (effectiveRole !== "faculty" && effectiveRole !== "student") {
       console.log(`Invalid role: ${effectiveRole}`)
       return NextResponse.json(
         {
@@ -137,24 +110,6 @@ export async function POST(request: NextRequest) {
         },
         { status: 400 }
       )
-    }
-
-    if (effectiveRole === "faculty") {
-      const existingFacultyProfile = await FacultyProfile.findOne({ faculty_id: facultyId })
-      if (existingFacultyProfile) {
-        return NextResponse.json(
-          { success: false, message: "Faculty ID is already registered" },
-          { status: 400 }
-        )
-      }
-    } else if (effectiveRole === "student") {
-      const existingStudentProfile = await StudentProfile.findOne({ registration_number: registrationNumber })
-      if (existingStudentProfile) {
-        return NextResponse.json(
-          { success: false, message: "Registration number is already registered" },
-          { status: 400 }
-        )
-      }
     }
 
     console.log("Hashing password...")
@@ -190,11 +145,11 @@ export async function POST(request: NextRequest) {
             [
               {
                 user_id: user._id,
-                faculty_id: facultyId,
-                department,
-                specialization,
-                date_of_joining: new Date(dateOfJoining),
-                date_of_birth: new Date(dateOfBirth),
+                faculty_id: getPendingProfileValue("faculty", user._id),
+                department: PENDING_PROFILE_PREFIX,
+                specialization: PENDING_PROFILE_PREFIX,
+                date_of_joining: new Date(0),
+                date_of_birth: new Date(0),
               },
             ],
             { session }
@@ -205,10 +160,10 @@ export async function POST(request: NextRequest) {
             [
               {
                 user_id: user._id,
-                registration_number: registrationNumber,
-                department,
-                year,
-                cgpa: Number.parseFloat(cgpa),
+                registration_number: getPendingProfileValue("student", user._id),
+                department: PENDING_PROFILE_PREFIX,
+                year: PENDING_PROFILE_PREFIX,
+                cgpa: 0,
               },
             ],
             { session }

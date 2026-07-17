@@ -35,6 +35,7 @@ export type FacultyProfileData = {
 
 const PROFILE_IMAGE_DATA_URL_PATTERN = /^data:image\/(png|jpeg|jpg|webp);base64,/
 const MAX_PROFILE_IMAGE_DATA_URL_LENGTH = 3 * 1024 * 1024
+const PENDING_PROFILE_PREFIX = "__pending__"
 
 function getProfilePictureUpdate(profilePictureUrl: string | undefined) {
   if (profilePictureUrl === undefined) {
@@ -64,6 +65,32 @@ function hasValue(value: unknown) {
   return String(value ?? "").trim().length > 0
 }
 
+function isPendingProfileValue(value: unknown) {
+  return String(value ?? "").startsWith(PENDING_PROFILE_PREFIX)
+}
+
+function getPendingProfileValue(kind: "faculty" | "student", userId: unknown) {
+  return `${PENDING_PROFILE_PREFIX}${kind}_${String(userId)}`
+}
+
+function hasRealValue(value: unknown) {
+  return hasValue(value) && !isPendingProfileValue(value) && value !== "Pending"
+}
+
+function hasRealDate(value: unknown) {
+  if (!value) return false
+  const date = value instanceof Date ? value : new Date(String(value))
+  return Number.isFinite(date.getTime()) && date.getTime() > 0
+}
+
+function displayProfileValue(value: unknown) {
+  return hasRealValue(value) ? String(value) : ""
+}
+
+function displayProfileDate(value: unknown) {
+  return hasRealDate(value) ? value : null
+}
+
 export async function getUserProfileCompletionStatus(user: UserProfileIdentity) {
   await connectToMongoDB()
 
@@ -87,12 +114,12 @@ export async function getUserProfileCompletionStatus(user: UserProfileIdentity) 
       ["Faculty ID", profile?.faculty_id],
       ["Department", profile?.department],
       ["Specialization", profile?.specialization],
-      ["Date of joining", profile?.date_of_joining],
-      ["Date of birth", profile?.date_of_birth],
+      ["Date of joining", hasRealDate(profile?.date_of_joining) ? "yes" : ""],
+      ["Date of birth", hasRealDate(profile?.date_of_birth) ? "yes" : ""],
       ["Phone", (profile as any)?.phone],
       ["Bio", (profile as any)?.bio],
     ] as const
-    const missing = checks.filter(([, value]) => !hasValue(value)).map(([label]) => label)
+    const missing = checks.filter(([, value]) => !hasRealValue(value)).map(([label]) => label)
     return { success: true, complete: missing.length === 0, role: "faculty", missing }
   }
 
@@ -110,13 +137,13 @@ export async function getUserProfileCompletionStatus(user: UserProfileIdentity) 
       ["Registration number", profile?.registration_number],
       ["Department", profile?.department],
       ["Year", profile?.year],
-      ["CGPA", profile?.cgpa],
+      ["CGPA", Number(profile?.cgpa || 0) > 0 ? "yes" : ""],
       ["Phone", (profile as any)?.phone],
       ["Bio", (profile as any)?.bio],
       ["Resume", resume?.file_url],
       ["At least one skill", skillCount > 0 ? "yes" : ""],
     ] as const
-    const missing = checks.filter(([, value]) => !hasValue(value)).map(([label]) => label)
+    const missing = checks.filter(([, value]) => !hasRealValue(value)).map(([label]) => label)
     return { success: true, complete: missing.length === 0, role: "student", missing }
   }
 
@@ -164,9 +191,9 @@ export async function getCurrentUserProfile() {
           last_name: user.last_name,
           email: user.email,
           profile_picture_url: user.profile_picture_url || null,
-          registration_number: studentProfile.registration_number,
-          department: studentProfile.department,
-          year: studentProfile.year,
+          registration_number: displayProfileValue(studentProfile.registration_number),
+          department: displayProfileValue(studentProfile.department),
+          year: displayProfileValue(studentProfile.year),
           cgpa: studentProfile.cgpa,
           phone: (studentProfile as any).phone || null,
           bio: (studentProfile as any).bio || null,
@@ -187,11 +214,11 @@ export async function getCurrentUserProfile() {
           last_name: user.last_name,
           email: user.email,
           profile_picture_url: user.profile_picture_url || null,
-          faculty_id: facultyProfile.faculty_id,
-          department: facultyProfile.department,
-          specialization: facultyProfile.specialization,
-          date_of_joining: facultyProfile.date_of_joining,
-          date_of_birth: facultyProfile.date_of_birth,
+          faculty_id: displayProfileValue(facultyProfile.faculty_id),
+          department: displayProfileValue(facultyProfile.department),
+          specialization: displayProfileValue(facultyProfile.specialization),
+          date_of_joining: displayProfileDate(facultyProfile.date_of_joining),
+          date_of_birth: displayProfileDate(facultyProfile.date_of_birth),
           phone: (facultyProfile as any).phone || null,
           bio: (facultyProfile as any).bio || null,
         },
@@ -247,10 +274,10 @@ export async function updateStudentProfile(data: StudentProfileData) {
     const updatedProfile = await StudentProfile.findOneAndUpdate(
       { user_id: userId },
       {
-        registration_number: data.registrationNumber,
-        department: data.department,
-        year: data.year,
-        cgpa: data.cgpa,
+        registration_number: data.registrationNumber || getPendingProfileValue("student", userId),
+        department: data.department || PENDING_PROFILE_PREFIX,
+        year: data.year || PENDING_PROFILE_PREFIX,
+        cgpa: data.cgpa || 0,
         phone: data.phone || undefined,
         bio: data.bio || undefined,
         updated_at: new Date(),
@@ -314,11 +341,11 @@ export async function updateFacultyProfile(data: FacultyProfileData) {
     const updatedProfile = await FacultyProfile.findOneAndUpdate(
       { user_id: userId },
       {
-        faculty_id: data.facultyId,
-        department: data.department,
-        specialization: data.specialization,
-        date_of_joining: new Date(data.dateOfJoining),
-        date_of_birth: new Date(data.dateOfBirth),
+        faculty_id: data.facultyId || getPendingProfileValue("faculty", userId),
+        department: data.department || PENDING_PROFILE_PREFIX,
+        specialization: data.specialization || PENDING_PROFILE_PREFIX,
+        date_of_joining: data.dateOfJoining ? new Date(data.dateOfJoining) : new Date(0),
+        date_of_birth: data.dateOfBirth ? new Date(data.dateOfBirth) : new Date(0),
         phone: data.phone || undefined,
         bio: data.bio || undefined,
         updated_at: new Date(),

@@ -14,28 +14,18 @@ import { useToast } from "@/components/ui/use-toast"
 import { AuthBackground } from "@/components/auth-background"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { AlertCircle } from "lucide-react"
+import { getApiUrl } from "@/lib/api-client"
 
 export default function RegisterPage() {
   const searchParams = useSearchParams()
   const initialRole = searchParams?.get("role") === "faculty" ? "faculty" : "student"
+  const isGoogleSignup = searchParams?.get("error") === "google_account_not_found"
   const [role, setRole] = useState(initialRole)
-  const [firstName, setFirstName] = useState(searchParams?.get("firstName") || "")
-  const [lastName, setLastName] = useState(searchParams?.get("lastName") || "")
+  const [fullName, setFullName] = useState(
+    [searchParams?.get("firstName"), searchParams?.get("lastName")].filter(Boolean).join(" "),
+  )
   const [email, setEmail] = useState(searchParams?.get("email") || "")
   const [password, setPassword] = useState("")
-  const [confirmPassword, setConfirmPassword] = useState("")
-
-  // Faculty specific fields
-  const [facultyId, setFacultyId] = useState("")
-  const [department, setDepartment] = useState("")
-  const [specialization, setSpecialization] = useState("")
-  const [dateOfJoining, setDateOfJoining] = useState("")
-  const [dateOfBirth, setDateOfBirth] = useState("")
-
-  // Student specific fields
-  const [registrationNumber, setRegistrationNumber] = useState("")
-  const [year, setYear] = useState("")
-  const [cgpa, setCgpa] = useState("")
 
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
@@ -57,7 +47,7 @@ export default function RegisterPage() {
     if (error === "google_account_not_found") {
       toast({
         title: "Complete registration",
-        description: "No portal account exists for that Google email yet. Complete the required profile fields to register.",
+        description: "No portal account exists for that Google email yet. Confirm your role and name to continue.",
       })
     }
   }, [searchParams, toast])
@@ -66,13 +56,16 @@ export default function RegisterPage() {
     e.preventDefault()
     setError("")
 
-    // Validate passwords match
-    if (password !== confirmPassword) {
-      setError("Passwords do not match. Please ensure both passwords are the same.")
+    const trimmedName = fullName.trim()
+    const [firstName, ...lastNameParts] = trimmedName.split(/\s+/)
+    const lastName = lastNameParts.join(" ")
+
+    if (!firstName || !lastName) {
+      setError("Please enter your full name.")
       toast({
         variant: "destructive",
-        title: "Passwords do not match",
-        description: "Please ensure both passwords are the same.",
+        title: "Full name required",
+        description: "Please enter both first and last name.",
       })
       return
     }
@@ -86,27 +79,12 @@ export default function RegisterPage() {
         firstName,
         lastName,
         email,
-        password,
         userAgent: navigator.userAgent,
         ipAddress,
       }
 
-      // Add role-specific fields
-      if (role === "faculty") {
-        Object.assign(registrationData, {
-          facultyId,
-          department,
-          specialization,
-          dateOfJoining,
-          dateOfBirth,
-        })
-      } else {
-        Object.assign(registrationData, {
-          registrationNumber,
-          department,
-          year,
-          cgpa,
-        })
+      if (!isGoogleSignup) {
+        registrationData.password = password
       }
 
       console.log("Submitting registration data:", {
@@ -128,7 +106,7 @@ export default function RegisterPage() {
       if (data.success) {
         toast({
           title: "Registration successful",
-          description: "Your account has been created. Redirecting to dashboard...",
+          description: "Your account has been created. Complete your profile to unlock portal actions.",
         })
 
         // Redirect based on user role
@@ -159,13 +137,22 @@ export default function RegisterPage() {
     }
   }
 
+  const handleGoogleSignUp = () => {
+    const params = new URLSearchParams({ role })
+    window.location.href = getApiUrl(`/api/auth/google/start?${params.toString()}`)
+  }
+
   return (
     <div className="flex min-h-screen items-center justify-center py-10">
       <AuthBackground />
       <Card className="w-full max-w-2xl z-10">
         <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold">Create an account</CardTitle>
-          <CardDescription>Enter your information to create an account</CardDescription>
+          <CardTitle className="text-2xl font-bold">{isGoogleSignup ? "Complete Google sign-up" : "Create an account"}</CardTitle>
+          <CardDescription>
+            {isGoogleSignup
+              ? "Confirm the basics now. You can complete your profile after sign-up."
+              : "Create your account now and complete your profile after login."}
+          </CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>
           <CardContent className="space-y-4">
@@ -180,7 +167,7 @@ export default function RegisterPage() {
             {/* Role Selection */}
             <div className="space-y-2">
               <Label>I am a</Label>
-              <RadioGroup value={role} onValueChange={setRole} className="flex space-x-4">
+              <RadioGroup value={role} onValueChange={setRole} className="flex space-x-4" disabled={isGoogleSignup}>
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="student" id="student" />
                   <Label htmlFor="student">Student</Label>
@@ -192,24 +179,23 @@ export default function RegisterPage() {
               </RadioGroup>
             </div>
 
-            {/* Common Fields */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="firstName">First Name</Label>
-                <Input id="firstName" value={firstName} onChange={(e) => setFirstName(e.target.value)} required />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="lastName">Last Name</Label>
-                <Input id="lastName" value={lastName} onChange={(e) => setLastName(e.target.value)} required />
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="fullName">Full Name</Label>
+              <Input
+                id="fullName"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                placeholder="Enter your full name"
+                required
+              />
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+              <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} disabled={isGoogleSignup} required />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            {!isGoogleSignup && (
               <div className="space-y-2">
                 <Label htmlFor="password">Password</Label>
                 <Input
@@ -220,118 +206,17 @@ export default function RegisterPage() {
                   required
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="confirmPassword">Confirm Password</Label>
-                <Input
-                  id="confirmPassword"
-                  type="password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  required
-                />
-              </div>
-            </div>
-
-            {/* Role-specific Fields */}
-            {role === "faculty" ? (
-              <div className="space-y-4 border p-4 rounded-md">
-                <h3 className="font-medium">Faculty Information</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="facultyId">Faculty ID</Label>
-                    <Input id="facultyId" value={facultyId} onChange={(e) => setFacultyId(e.target.value)} required />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="department">Department</Label>
-                    <Input
-                      id="department"
-                      value={department}
-                      onChange={(e) => setDepartment(e.target.value)}
-                      required
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="specialization">Specialization</Label>
-                  <Input
-                    id="specialization"
-                    value={specialization}
-                    onChange={(e) => setSpecialization(e.target.value)}
-                    required
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="dateOfJoining">Date of Joining</Label>
-                    <Input
-                      id="dateOfJoining"
-                      type="date"
-                      value={dateOfJoining}
-                      onChange={(e) => setDateOfJoining(e.target.value)}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="dateOfBirth">Date of Birth</Label>
-                    <Input
-                      id="dateOfBirth"
-                      type="date"
-                      value={dateOfBirth}
-                      onChange={(e) => setDateOfBirth(e.target.value)}
-                      required
-                    />
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-4 border p-4 rounded-md">
-                <h3 className="font-medium">Student Information</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="registrationNumber">Registration Number</Label>
-                    <Input
-                      id="registrationNumber"
-                      value={registrationNumber}
-                      onChange={(e) => setRegistrationNumber(e.target.value)}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="department">Department</Label>
-                    <Input
-                      id="department"
-                      value={department}
-                      onChange={(e) => setDepartment(e.target.value)}
-                      required
-                    />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="year">Year</Label>
-                    <Input id="year" value={year} onChange={(e) => setYear(e.target.value)} required />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="cgpa">CGPA</Label>
-                    <Input
-                      id="cgpa"
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      max="10"
-                      value={cgpa}
-                      onChange={(e) => setCgpa(e.target.value)}
-                      required
-                    />
-                  </div>
-                </div>
-              </div>
             )}
           </CardContent>
           <CardFooter className="flex flex-col space-y-4">
             <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Creating account..." : "Register"}
+              {loading ? "Creating account..." : isGoogleSignup ? "Create Google Account" : "Register"}
             </Button>
+            {!isGoogleSignup && (
+              <Button type="button" variant="outline" className="w-full" onClick={handleGoogleSignUp} disabled={loading}>
+                Continue with Google
+              </Button>
+            )}
             <div className="text-center text-sm">
               Already have an account?{" "}
               <Link href="/login" className="text-primary hover:underline">
