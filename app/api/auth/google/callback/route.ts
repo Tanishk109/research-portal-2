@@ -11,6 +11,7 @@ import {
   IS_GOOGLE_AUTH_CONFIGURED,
   JWT_EXPIRATION,
   JWT_SECRET,
+  NEXT_PUBLIC_APP_URL,
 } from "@/lib/env"
 
 export const dynamic = "force-dynamic"
@@ -30,9 +31,34 @@ type GoogleUserInfo = {
   name?: string
 }
 
+class GoogleOAuthError extends Error {
+  constructor(
+    message: string,
+    public readonly status: number,
+    public readonly googleError?: string,
+    public readonly googleDescription?: string,
+  ) {
+    super(message)
+  }
+}
+
 function getRedirectUri(request: NextRequest) {
   if (GOOGLE_REDIRECT_URI) return GOOGLE_REDIRECT_URI
   return new URL("/api/auth/google/callback", request.url).toString()
+}
+
+function getAppUrl(request: NextRequest, path: string) {
+  if (NEXT_PUBLIC_APP_URL) {
+    return new URL(path, NEXT_PUBLIC_APP_URL)
+  }
+
+  const forwardedHost = request.headers.get("x-forwarded-host")
+  const forwardedProto = request.headers.get("x-forwarded-proto") || "https"
+  if (forwardedHost) {
+    return new URL(path, `${forwardedProto}://${forwardedHost}`)
+  }
+
+  return new URL(path, request.url)
 }
 
 function decodeState(rawState: string | null): GoogleState | null {
@@ -65,12 +91,24 @@ async function exchangeCodeForAccessToken(request: NextRequest, code: string) {
 
   if (!response.ok) {
     const errorText = await response.text().catch(() => "")
+    let googleError = ""
+    let googleDescription = ""
+    try {
+      const parsed = JSON.parse(errorText)
+      googleError = typeof parsed.error === "string" ? parsed.error : ""
+      googleDescription = typeof parsed.error_description === "string" ? parsed.error_description : ""
+    } catch {
+      // Keep the raw text in the server log below.
+    }
+
     console.error("Google token exchange failed", {
       status: response.status,
       redirectUri,
+      googleError,
+      googleDescription,
       error: errorText,
     })
-    throw new Error(`google_token_exchange_failed_${response.status}`)
+    throw new GoogleOAuthError(`google_token_exchange_failed_${response.status}`, response.status, googleError, googleDescription)
   }
 
   const tokenPayload = await response.json()
@@ -94,7 +132,7 @@ async function fetchGoogleUser(accessToken: string) {
 }
 
 export async function GET(request: NextRequest) {
-  const loginUrl = new URL("/login", request.url)
+  const loginUrl = getAppUrl(request, "/login")
 
   try {
     if (!IS_GOOGLE_AUTH_CONFIGURED) {
@@ -134,7 +172,7 @@ export async function GET(request: NextRequest) {
     })
 
     if (!user) {
-      const registerUrl = new URL("/register", request.url)
+      const registerUrl = getAppUrl(request, "/register")
       registerUrl.searchParams.set("role", state.role)
       registerUrl.searchParams.set("email", email)
       registerUrl.searchParams.set("firstName", googleUser.given_name || "")
@@ -193,13 +231,14 @@ export async function GET(request: NextRequest) {
       .sign(new TextEncoder().encode(JWT_SECRET))
 
     const destination = state.redirect || `/dashboard/${user.role}`
-    const response = NextResponse.redirect(new URL(destination, request.url))
+    const response = NextResponse.redirect(getAppUrl(request, destination))
     response.cookies.set("session", token, COOKIE_SETTINGS)
     response.cookies.delete("google_oauth_nonce")
     return response
   } catch (error) {
     console.error("Google authentication error:", error)
-    loginUrl.searchParams.set("error", "google_auth_failed")
+    const googleError = error instanceof GoogleOAuthError ? error.googleError : ""
+    loginUrl.searchParams.set("error", googleError === "invalid_grant" ? "google_invalid_grant" : "google_auth_failed")
     const response = NextResponse.redirect(loginUrl)
     response.cookies.delete("google_oauth_nonce")
     return response

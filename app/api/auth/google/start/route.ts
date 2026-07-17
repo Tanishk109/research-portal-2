@@ -1,6 +1,6 @@
 import { randomBytes } from "crypto"
 import { NextResponse, type NextRequest } from "next/server"
-import { GOOGLE_CLIENT_ID, GOOGLE_REDIRECT_URI, IS_GOOGLE_AUTH_CONFIGURED } from "@/lib/env"
+import { GOOGLE_CLIENT_ID, GOOGLE_REDIRECT_URI, IS_GOOGLE_AUTH_CONFIGURED, NEXT_PUBLIC_APP_URL } from "@/lib/env"
 
 export const dynamic = "force-dynamic"
 
@@ -11,9 +11,23 @@ function getRedirectUri(request: NextRequest) {
   return new URL("/api/auth/google/callback", request.url).toString()
 }
 
+function getAppUrl(request: NextRequest, path: string) {
+  if (NEXT_PUBLIC_APP_URL) {
+    return new URL(path, NEXT_PUBLIC_APP_URL)
+  }
+
+  const forwardedHost = request.headers.get("x-forwarded-host")
+  const forwardedProto = request.headers.get("x-forwarded-proto") || "https"
+  if (forwardedHost) {
+    return new URL(path, `${forwardedProto}://${forwardedHost}`)
+  }
+
+  return new URL(path, request.url)
+}
+
 export async function GET(request: NextRequest) {
   if (!IS_GOOGLE_AUTH_CONFIGURED) {
-    return NextResponse.redirect(new URL("/login?error=google_not_configured", request.url))
+    return NextResponse.redirect(getAppUrl(request, "/login?error=google_not_configured"))
   }
 
   const role = request.nextUrl.searchParams.get("role") || "student"

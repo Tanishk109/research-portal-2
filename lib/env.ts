@@ -1,15 +1,19 @@
 function normalizeUrl(value?: string) {
   if (!value) return ""
-  return value.replace(/\/+$/, "")
+  return value.trim().replace(/\/+$/, "")
 }
 
-export const MONGODB_URI = process.env.MONGODB_URI || ""
+function normalizeEnv(value?: string) {
+  return value?.trim() || ""
+}
+
+export const MONGODB_URI = normalizeEnv(process.env.MONGODB_URI)
 
 export const IS_DB_CONFIGURED = MONGODB_URI.startsWith("mongodb://") || MONGODB_URI.startsWith("mongodb+srv://")
 
 // JWT configuration
-export const JWT_SECRET = process.env.JWT_SECRET || "your-super-secret-jwt-key-change-in-production"
-export const JWT_EXPIRATION = process.env.JWT_EXPIRATION || "7d"
+export const JWT_SECRET = normalizeEnv(process.env.JWT_SECRET) || "your-super-secret-jwt-key-change-in-production"
+export const JWT_EXPIRATION = normalizeEnv(process.env.JWT_EXPIRATION) || "7d"
 
 // Deployment URLs
 export const NEXT_PUBLIC_APP_URL = normalizeUrl(
@@ -22,8 +26,8 @@ export const NEXT_PUBLIC_API_URL = normalizeUrl(process.env.NEXT_PUBLIC_API_URL 
 export const API_URL = normalizeUrl(NEXT_PUBLIC_API_URL || NEXT_PUBLIC_APP_URL)
 
 // Google OAuth configuration
-export const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || ""
-export const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || ""
+export const GOOGLE_CLIENT_ID = normalizeEnv(process.env.GOOGLE_CLIENT_ID)
+export const GOOGLE_CLIENT_SECRET = normalizeEnv(process.env.GOOGLE_CLIENT_SECRET)
 export const GOOGLE_REDIRECT_URI = normalizeUrl(process.env.GOOGLE_REDIRECT_URI || "")
 export const IS_GOOGLE_AUTH_CONFIGURED = !!GOOGLE_CLIENT_ID && !!GOOGLE_CLIENT_SECRET
 
