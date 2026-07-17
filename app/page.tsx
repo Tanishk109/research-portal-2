@@ -8,45 +8,118 @@ import { AnimatedBackground } from "@/components/animated-background"
 import { GradientBackground } from "@/components/gradient-background"
 import { AnimatedShapes } from "@/components/animated-shapes"
 import { connectToMongoDB } from "@/lib/mongodb"
-import { User } from "@/lib/models"
+import { Project, User } from "@/lib/models"
 import { toPlainObject } from "@/lib/db"
 
 export const dynamic = "force-dynamic"
 
 export default async function Home() {
-  // Fetch first 3 faculty for homepage preview
   let faculty: any[] = []
+  let featuredProject: any | null = null
+  let researchAreas: any[] = []
+
   try {
     await connectToMongoDB()
-    const facultyData = await User.aggregate([
-      { $match: { role: "faculty" } },
-      {
-        $lookup: {
-          from: "facultyprofiles",
-          localField: "_id",
-          foreignField: "user_id",
-          as: "profile",
+
+    const [facultyData, featuredProjectData, researchAreaData] = await Promise.all([
+      User.aggregate([
+        { $match: { role: "faculty" } },
+        {
+          $lookup: {
+            from: "facultyprofiles",
+            localField: "_id",
+            foreignField: "user_id",
+            as: "profile",
+          },
         },
-      },
-      { $unwind: "$profile" },
-      {
-        $project: {
-          first_name: 1,
-          last_name: 1,
-          email: 1,
-          profile_picture_url: 1,
-          department: "$profile.department",
-          specialization: "$profile.specialization",
+        { $unwind: "$profile" },
+        {
+          $project: {
+            first_name: 1,
+            last_name: 1,
+            email: 1,
+            profile_picture_url: 1,
+            department: "$profile.department",
+            specialization: "$profile.specialization",
+          },
         },
-      },
-      { $sort: { department: 1, last_name: 1 } },
-      { $limit: 3 },
+        { $sort: { department: 1, last_name: 1 } },
+        { $limit: 3 },
+      ]),
+      Project.aggregate([
+        { $match: { status: "active" } },
+        {
+          $lookup: {
+            from: "facultyprofiles",
+            localField: "faculty_id",
+            foreignField: "_id",
+            as: "facultyProfile",
+          },
+        },
+        { $unwind: "$facultyProfile" },
+        {
+          $lookup: {
+            from: "users",
+            localField: "facultyProfile.user_id",
+            foreignField: "_id",
+            as: "facultyUser",
+          },
+        },
+        { $unwind: "$facultyUser" },
+        {
+          $project: {
+            id: { $toString: "$_id" },
+            title: 1,
+            description: 1,
+            research_area: 1,
+            tags: { $ifNull: ["$tags", []] },
+            faculty_name: { $concat: ["$facultyUser.first_name", " ", "$facultyUser.last_name"] },
+            department: "$facultyProfile.department",
+          },
+        },
+        { $sort: { created_at: -1 } },
+        { $limit: 1 },
+      ]),
+      Project.aggregate([
+        { $match: { status: "active", research_area: { $nin: [null, ""] } } },
+        {
+          $group: {
+            _id: "$research_area",
+            count: { $sum: 1 },
+            latestProjectId: { $first: "$_id" },
+          },
+        },
+        { $sort: { count: -1, _id: 1 } },
+        { $limit: 6 },
+        {
+          $project: {
+            _id: 0,
+            title: "$_id",
+            count: 1,
+          },
+        },
+      ]),
     ])
+
     faculty = facultyData.map(toPlainObject)
+    featuredProject = featuredProjectData[0] ? toPlainObject(featuredProjectData[0]) : null
+    researchAreas = researchAreaData.map(toPlainObject)
   } catch (error) {
-    console.log("No faculty data available yet:", error)
+    console.log("No homepage data available yet:", error)
     faculty = []
+    featuredProject = null
+    researchAreas = []
   }
+
+  const areaColorClasses = [
+    "from-primary-500 to-primary-600",
+    "from-secondary-500 to-secondary-600",
+    "from-accent-500 to-accent-600",
+    "from-primary-500 to-secondary-500",
+    "from-secondary-500 to-accent-500",
+    "from-accent-500 to-tertiary-500",
+  ]
+
   return (
     <div className="flex min-h-screen flex-col">
       <header className="sticky top-0 z-50 w-full border-b bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -124,34 +197,48 @@ export default async function Home() {
                 <div className="relative w-full max-w-md">
                   <div className="absolute -top-4 -left-4 h-72 w-72 bg-primary-500/20 rounded-full blur-3xl animate-pulse-slow" />
                   <div className="absolute -bottom-4 -right-4 h-72 w-72 bg-secondary-500/20 rounded-full blur-3xl animate-pulse-slow" />
-                  <div className="relative bg-white/10 backdrop-blur-sm rounded-lg border border-white/20 shadow-lg p-6 animate-float">
-                    <div className="space-y-4">
-                      <div className="flex items-center gap-4">
-                        <div className="h-12 w-12 rounded-full bg-gradient-to-br from-primary-500 to-secondary-500 flex items-center justify-center">
-                          <BookOpen className="h-6 w-6 text-white" />
+                  {featuredProject ? (
+                    <div className="relative bg-white/10 backdrop-blur-sm rounded-lg border border-white/20 shadow-lg p-6 animate-float">
+                      <div className="space-y-4">
+                        <div className="flex items-center gap-4">
+                          <div className="h-12 w-12 rounded-full bg-gradient-to-br from-primary-500 to-secondary-500 flex items-center justify-center">
+                            <BookOpen className="h-6 w-6 text-white" />
+                          </div>
+                          <div>
+                            <h3 className="font-semibold">{featuredProject.title}</h3>
+                            <p className="text-sm text-foreground/80">
+                              {featuredProject.faculty_name} • {featuredProject.department}
+                            </p>
+                          </div>
                         </div>
-                        <div>
-                          <h3 className="font-semibold">Machine Learning Research</h3>
-                          <p className="text-sm text-foreground/80">Dr. Sarah Johnson • Computer Science</p>
+                        <p className="text-sm">{featuredProject.description}</p>
+                        <div className="flex flex-wrap items-center gap-2 text-sm">
+                          {(featuredProject.tags || []).slice(0, 3).map((tag: string) => (
+                            <span key={tag} className="bg-primary-500/20 text-primary-500 px-2 py-1 rounded-full">
+                              {tag}
+                            </span>
+                          ))}
                         </div>
+                        <Button asChild variant="outline" size="sm" className="w-full relative overflow-hidden group">
+                          <Link href={`/projects/${featuredProject.id}`}>
+                            <span className="relative z-10">View Details</span>
+                            <span className="absolute inset-0 bg-gradient-to-r from-primary-400 to-secondary-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></span>
+                          </Link>
+                        </Button>
                       </div>
-                      <p className="text-sm">
-                        Looking for students interested in applying machine learning techniques to solve real-world
-                        problems in healthcare.
-                      </p>
-                      <div className="flex items-center gap-2 text-sm">
-                        <span className="bg-primary-500/20 text-primary-500 px-2 py-1 rounded-full">ML</span>
-                        <span className="bg-secondary-500/20 text-secondary-500 px-2 py-1 rounded-full">
-                          Healthcare
-                        </span>
-                        <span className="bg-accent-500/20 text-accent-500 px-2 py-1 rounded-full">Python</span>
-                      </div>
-                      <Button variant="outline" size="sm" className="w-full relative overflow-hidden group">
-                        <span className="relative z-10">View Details</span>
-                        <span className="absolute inset-0 bg-gradient-to-r from-primary-400 to-secondary-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></span>
-                      </Button>
                     </div>
-                  </div>
+                  ) : (
+                    <div className="relative bg-white/10 backdrop-blur-sm rounded-lg border border-white/20 shadow-lg p-6 animate-float">
+                      <div className="space-y-4 text-center">
+                        <BookOpen className="mx-auto h-10 w-10 text-primary-500" />
+                        <h3 className="font-semibold">No active projects yet</h3>
+                        <p className="text-sm text-foreground/80">Active MongoDB projects will appear here automatically.</p>
+                        <Button asChild variant="outline" size="sm" className="w-full">
+                          <Link href="/projects">Browse Projects</Link>
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -247,70 +334,49 @@ export default async function Home() {
               </div>
             </div>
             <div className="mx-auto grid max-w-5xl grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3 mt-12">
-              {[
-                {
-                  title: "Artificial Intelligence",
-                  description: "Machine learning, neural networks, and natural language processing research.",
-                  count: 12,
-                  color: "from-primary-500 to-primary-600",
-                },
-                {
-                  title: "Biotechnology",
-                  description: "Genetic engineering, bioinformatics, and pharmaceutical research.",
-                  count: 8,
-                  color: "from-secondary-500 to-secondary-600",
-                },
-                {
-                  title: "Renewable Energy",
-                  description: "Solar power, wind energy, and sustainable technology research.",
-                  count: 10,
-                  color: "from-accent-500 to-accent-600",
-                },
-                {
-                  title: "Material Science",
-                  description: "Nanomaterials, polymers, and advanced materials research.",
-                  count: 7,
-                  color: "from-primary-500 to-secondary-500",
-                },
-                {
-                  title: "Robotics",
-                  description: "Autonomous systems, human-robot interaction, and robotic applications.",
-                  count: 9,
-                  color: "from-secondary-500 to-accent-500",
-                },
-                {
-                  title: "Data Science",
-                  description: "Big data analytics, statistical modeling, and data visualization.",
-                  count: 14,
-                  color: "from-accent-500 to-tertiary-500",
-                },
-              ].map((area, index) => (
+              {researchAreas.length === 0 ? (
+                <Card className="col-span-full border-none shadow-md bg-white/80 backdrop-blur-sm">
+                  <CardHeader>
+                    <CardTitle>No research areas yet</CardTitle>
+                    <CardDescription>Research area cards will appear when active projects are created in MongoDB.</CardDescription>
+                  </CardHeader>
+                  <CardFooter>
+                    <Link href="/projects">
+                      <Button variant="outline" size="sm">Browse Projects</Button>
+                    </Link>
+                  </CardFooter>
+                </Card>
+              ) : researchAreas.map((area, index) => {
+                const color = areaColorClasses[index % areaColorClasses.length]
+
+                return (
                 <Card
-                  key={index}
+                  key={area.title}
                   className="border-none shadow-md overflow-hidden bg-white/80 backdrop-blur-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1"
                 >
-                  <div className={`h-2 bg-gradient-to-r ${area.color}`}></div>
+                  <div className={`h-2 bg-gradient-to-r ${color}`}></div>
                   <CardHeader>
-                    <CardTitle className="bg-clip-text text-transparent bg-gradient-to-r ${area.color}">
+                    <CardTitle className={`bg-clip-text text-transparent bg-gradient-to-r ${color}`}>
                       {area.title}
                     </CardTitle>
                     <CardDescription>{area.count} active projects</CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <p className="text-muted-foreground">{area.description}</p>
+                    <p className="text-muted-foreground">Active projects listed under this research area.</p>
                   </CardContent>
                   <CardFooter>
-                    <Link href={`/projects?area=${area.title.toLowerCase().replace(" ", "-")}`}>
+                    <Link href={`/projects?area=${encodeURIComponent(area.title)}`}>
                       <Button variant="outline" size="sm" className="relative overflow-hidden group">
                         <span className="relative z-10">View Projects</span>
                         <span
-                          className={`absolute inset-0 bg-gradient-to-r ${area.color} opacity-0 group-hover:opacity-100 transition-opacity duration-300`}
+                          className={`absolute inset-0 bg-gradient-to-r ${color} opacity-0 group-hover:opacity-100 transition-opacity duration-300`}
                         ></span>
                       </Button>
                     </Link>
                   </CardFooter>
                 </Card>
-              ))}
+                )
+              })}
             </div>
           </div>
         </AnimatedShapes>

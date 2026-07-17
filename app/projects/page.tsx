@@ -11,13 +11,17 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { BookOpen, Search, Filter } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { getProjects, type ProjectWithFaculty } from "@/app/actions/projects"
+import { getProjectFilterOptions, getProjects, type ProjectWithFaculty } from "@/app/actions/projects"
 import { useSearchParams, useRouter } from "next/navigation"
 
 export default function ProjectsPage() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const [projects, setProjects] = useState<ProjectWithFaculty[]>([])
+  const [filterOptions, setFilterOptions] = useState<{ departments: string[]; researchAreas: string[] }>({
+    departments: [],
+    researchAreas: [],
+  })
   const [loading, setLoading] = useState(true)
   const [filters, setFilters] = useState({
     department: searchParams?.get("department") || "",
@@ -54,6 +58,15 @@ export default function ProjectsPage() {
 
     fetchProjects()
   }, [filters])
+
+  useEffect(() => {
+    async function fetchFilterOptions() {
+      const options = await getProjectFilterOptions()
+      setFilterOptions(options)
+    }
+
+    fetchFilterOptions()
+  }, [])
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
@@ -125,11 +138,11 @@ export default function ProjectsPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Departments</SelectItem>
-                  <SelectItem value="cs">Computer Science</SelectItem>
-                  <SelectItem value="ee">Electrical Engineering</SelectItem>
-                  <SelectItem value="me">Mechanical Engineering</SelectItem>
-                  <SelectItem value="bt">Biotechnology</SelectItem>
-                  <SelectItem value="ph">Physics</SelectItem>
+                  {filterOptions.departments.map((department) => (
+                    <SelectItem key={department} value={department}>
+                      {department}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
               <Select
@@ -141,11 +154,11 @@ export default function ProjectsPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Areas</SelectItem>
-                  <SelectItem value="ai">Artificial Intelligence</SelectItem>
-                  <SelectItem value="re">Renewable Energy</SelectItem>
-                  <SelectItem value="bio">Biotechnology</SelectItem>
-                  <SelectItem value="qc">Quantum Computing</SelectItem>
-                  <SelectItem value="bc">Blockchain</SelectItem>
+                  {filterOptions.researchAreas.map((researchArea) => (
+                    <SelectItem key={researchArea} value={researchArea}>
+                      {researchArea}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
               <Button variant="outline" type="submit" className="w-full">

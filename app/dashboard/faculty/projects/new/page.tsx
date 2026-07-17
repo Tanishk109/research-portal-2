@@ -9,7 +9,6 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { X } from "lucide-react"
 import FacultyDashboardHeader from "@/components/faculty-dashboard-header"
@@ -119,21 +118,13 @@ export default function NewProjectPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
                     <Label htmlFor="research-area">Research Area</Label>
-                    <Select name="research-area" required>
-                      <SelectTrigger id="research-area" className="bg-white/80">
-                        <SelectValue placeholder="Select area" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="ai">Artificial Intelligence</SelectItem>
-                        <SelectItem value="ml">Machine Learning</SelectItem>
-                        <SelectItem value="nlp">Natural Language Processing</SelectItem>
-                        <SelectItem value="cv">Computer Vision</SelectItem>
-                        <SelectItem value="re">Renewable Energy</SelectItem>
-                        <SelectItem value="bio">Biotechnology</SelectItem>
-                        <SelectItem value="qc">Quantum Computing</SelectItem>
-                        <SelectItem value="bc">Blockchain</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <Input
+                      id="research-area"
+                      name="research-area"
+                      placeholder="Enter research area"
+                      className="bg-white/80"
+                      required
+                    />
                   </div>
 
                   <div className="space-y-2">

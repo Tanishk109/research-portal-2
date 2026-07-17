@@ -812,15 +812,6 @@ export default function StudentProfilePage() {
                     </div>
                   )}
 
-                  <div className="space-y-2">
-                    <Label htmlFor="cv-description">Resume Notes</Label>
-                    <Textarea
-                      id="cv-description"
-                      placeholder="Add a brief note about your resume..."
-                      className="min-h-[80px] bg-white/90"
-                      defaultValue="My resume highlights my academic achievements, technical skills, and relevant coursework in Computer Science with a focus on machine learning and data analysis."
-                    />
-                  </div>
                 </CardContent>
               </Card>
             </TabsContent>
@@ -926,15 +917,6 @@ export default function StudentProfilePage() {
                     </Button>
                   </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="skill-description">Skills Description</Label>
-                    <Textarea
-                      id="skill-description"
-                      placeholder="Describe your skills and expertise in more detail..."
-                      className="min-h-[100px] bg-white/90"
-                      defaultValue="I have strong programming skills in Python and Java, with experience in machine learning frameworks like TensorFlow and PyTorch. I'm also proficient in data analysis using pandas and numpy, and have good problem-solving abilities."
-                    />
-                  </div>
                 </CardContent>
                 <CardFooter className="flex justify-end">
                   <Button 

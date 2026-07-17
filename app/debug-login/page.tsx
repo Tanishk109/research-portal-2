@@ -11,16 +11,16 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 export default function DebugLoginPage() {
-  const [email, setEmail] = useState("faculty@example.com")
-  const [password, setPassword] = useState("password123")
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<any>(null)
   const [error, setError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<"login" | "register">("login")
 
   // For registration
-  const [firstName, setFirstName] = useState("Test")
-  const [lastName, setLastName] = useState("User")
+  const [firstName, setFirstName] = useState("")
+  const [lastName, setLastName] = useState("")
   const [role, setRole] = useState("faculty")
 
   const handleLogin = async (e: React.FormEvent) => {

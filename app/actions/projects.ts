@@ -206,6 +206,25 @@ export async function getActiveProjects() {
   }
 }
 
+export async function getProjectFilterOptions() {
+  try {
+    await connectToMongoDB()
+
+    const [departments, researchAreas] = await Promise.all([
+      FacultyProfile.distinct("department", { department: { $nin: [null, ""] } }),
+      Project.distinct("research_area", { research_area: { $nin: [null, ""] } }),
+    ])
+
+    return {
+      departments: departments.map(String).sort((a, b) => a.localeCompare(b)),
+      researchAreas: researchAreas.map(String).sort((a, b) => a.localeCompare(b)),
+    }
+  } catch (error) {
+    console.error("Get project filter options error:", error)
+    return { departments: [], researchAreas: [] }
+  }
+}
+
 // Get project by ID
 export async function getProjectById(id: number | string) {
   try {

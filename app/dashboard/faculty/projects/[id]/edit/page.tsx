@@ -210,21 +210,13 @@ export default function EditProjectPage() {
                   <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                     <div className="space-y-2">
                       <Label htmlFor="research-area">Research Area</Label>
-                      <Select name="research-area" defaultValue={project.research_area || "ai"} required>
-                        <SelectTrigger id="research-area" className="bg-white/80">
-                          <SelectValue placeholder="Select area" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="ai">Artificial Intelligence</SelectItem>
-                          <SelectItem value="ml">Machine Learning</SelectItem>
-                          <SelectItem value="nlp">Natural Language Processing</SelectItem>
-                          <SelectItem value="cv">Computer Vision</SelectItem>
-                          <SelectItem value="re">Renewable Energy</SelectItem>
-                          <SelectItem value="bio">Biotechnology</SelectItem>
-                          <SelectItem value="qc">Quantum Computing</SelectItem>
-                          <SelectItem value="bc">Blockchain</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <Input
+                        id="research-area"
+                        name="research-area"
+                        defaultValue={project.research_area || ""}
+                        className="bg-white/80"
+                        required
+                      />
                     </div>
 
                     <div className="space-y-2">

@@ -11,25 +11,7 @@ export default function DebugRegisterPage() {
   const [loading, setLoading] = useState(false)
   const [response, setResponse] = useState<any>(null)
   const [error, setError] = useState<string | null>(null)
-  const [requestBody, setRequestBody] = useState(
-    JSON.stringify(
-      {
-        role: "student",
-        firstName: "Test",
-        lastName: "Student",
-        email: "test.student@example.com",
-        password: "password123",
-        registrationNumber: "REG12345",
-        department: "Computer Science",
-        year: "2023",
-        cgpa: "8.5",
-        userAgent: "Debug Test",
-        ipAddress: "127.0.0.1",
-      },
-      null,
-      2,
-    ),
-  )
+  const [requestBody, setRequestBody] = useState("{}")
 
   const handleSubmit = async () => {
     setLoading(true)
