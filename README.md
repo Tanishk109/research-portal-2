@@ -265,8 +265,12 @@ Open [http://localhost:3000](http://localhost:3000).
 | `NEXT_PUBLIC_APP_URL` | Production | Canonical public URL of the application |
 | `NEXT_PUBLIC_API_URL` | Usually no | Only needed when the API is hosted separately |
 | `EMAIL_FROM` | Yes | Sender address shown on verification emails |
-| `EMAIL_PROVIDER` | Yes | Must be `resend` |
-| `RESEND_API_KEY` | Yes | Resend API key used for HTTPS email delivery |
+| `EMAIL_PROVIDER` | Yes | Use `gmail` for project/demo sending or `resend` for verified-domain sending |
+| `GMAIL_CLIENT_ID` | Gmail provider | Google OAuth client ID |
+| `GMAIL_CLIENT_SECRET` | Gmail provider | Google OAuth client secret |
+| `GMAIL_REFRESH_TOKEN` | Gmail provider | Refresh token with `gmail.send` scope |
+| `GMAIL_SENDER_EMAIL` | Gmail provider | Gmail account used to send verification emails |
+| `RESEND_API_KEY` | Resend provider | Resend API key used for HTTPS email delivery |
 
 ## Authentication and Access Control
 
@@ -319,12 +323,15 @@ JWT_SECRET=your_production_jwt_secret
 JWT_EXPIRATION=7d
 NEXT_PUBLIC_APP_URL=https://research-portal-2-tvgq.onrender.com
 NEXT_PUBLIC_API_URL=
-EMAIL_PROVIDER=resend
-RESEND_API_KEY=re_xxxxxxxxxxxxxxxxxxxxxxxxx
-EMAIL_FROM=MUJ Research Portal <verified-sender@yourdomain.com>
+EMAIL_PROVIDER=gmail
+EMAIL_FROM=MUJ Research Portal <your-sender@gmail.com>
+GMAIL_SENDER_EMAIL=your-sender@gmail.com
+GMAIL_CLIENT_ID=your-google-oauth-client-id.apps.googleusercontent.com
+GMAIL_CLIENT_SECRET=your-google-oauth-client-secret
+GMAIL_REFRESH_TOKEN=your-google-oauth-refresh-token
 ```
 
-Render free services block outbound SMTP ports, so the application sends verification email through Resend's HTTPS API. For public registration, verify your own sending domain in Resend; `onboarding@resend.dev` is only suitable for testing with the email address attached to your Resend account.
+Render free services block outbound SMTP ports, so the application sends verification email through HTTPS providers. For this project, Gmail API is supported without needing a custom domain. For production-style sending, use Resend with a verified sending domain.
 
 Redeploy the service after modifying environment variables.
 

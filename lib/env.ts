@@ -30,6 +30,12 @@ export const EMAIL_PROVIDER = normalizeEnv(process.env.EMAIL_PROVIDER).toLowerCa
 export const RESEND_API_KEY = normalizeEnv(process.env.RESEND_API_KEY)
 export const EMAIL_FROM = normalizeEnv(process.env.EMAIL_FROM)
 export const IS_RESEND_CONFIGURED = Boolean(RESEND_API_KEY) && Boolean(EMAIL_FROM)
+export const GMAIL_CLIENT_ID = normalizeEnv(process.env.GMAIL_CLIENT_ID)
+export const GMAIL_CLIENT_SECRET = normalizeEnv(process.env.GMAIL_CLIENT_SECRET)
+export const GMAIL_REFRESH_TOKEN = normalizeEnv(process.env.GMAIL_REFRESH_TOKEN)
+export const GMAIL_SENDER_EMAIL = normalizeEnv(process.env.GMAIL_SENDER_EMAIL) || EMAIL_FROM
+export const IS_GMAIL_CONFIGURED =
+  Boolean(GMAIL_CLIENT_ID) && Boolean(GMAIL_CLIENT_SECRET) && Boolean(GMAIL_REFRESH_TOKEN) && Boolean(GMAIL_SENDER_EMAIL)
 
 if (process.env.NODE_ENV === "production" && !JWT_SECRET) {
   throw new Error("JWT_SECRET is required in production")

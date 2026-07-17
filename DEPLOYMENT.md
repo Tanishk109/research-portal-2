@@ -16,31 +16,51 @@ JWT_SECRET=<long-random-secret-at-least-32-chars>
 JWT_EXPIRATION=7d
 NEXT_PUBLIC_APP_URL=https://your-production-domain.com
 NEXT_PUBLIC_API_URL=
-
-EMAIL_PROVIDER=resend
-RESEND_API_KEY=re_xxxxxxxxxxxxxxxxxxxxxxxxx
-EMAIL_FROM=MUJ Research Portal <verified-sender@yourdomain.com>
 ```
 
-Render free services block outbound SMTP ports `25`, `465`, and `587`, so the app uses Resend over HTTPS. Do not use Gmail SMTP on Render free.
+## Gmail API Email Provider
 
-## Resend Testing
-
-For quick testing, `onboarding@resend.dev` can send only to the email address attached to your Resend account. It cannot verify arbitrary student or faculty emails.
-
-For production, verify a domain or subdomain you own in Resend, such as:
-
-```text
-mail.mujresearchportal.in
-```
-
-After SPF/DKIM verification succeeds, use a sender from that verified domain:
+For a project/demo, Gmail API is the easiest HTTPS sender because it does not require a custom domain and it avoids Render's blocked SMTP ports.
 
 ```env
-EMAIL_FROM=MUJ Research Portal <verify@mail.mujresearchportal.in>
+EMAIL_PROVIDER=gmail
+EMAIL_FROM=MUJ Research Portal <your-sender@gmail.com>
+GMAIL_SENDER_EMAIL=your-sender@gmail.com
+GMAIL_CLIENT_ID=your-google-oauth-client-id.apps.googleusercontent.com
+GMAIL_CLIENT_SECRET=your-google-oauth-client-secret
+GMAIL_REFRESH_TOKEN=your-google-oauth-refresh-token
 ```
 
-You cannot verify `onrender.com` because it is a shared domain.
+The app still creates the verification token and account flow. Gmail API only sends the email.
+
+### Getting the Gmail Refresh Token
+
+1. Open Google Cloud Console.
+2. Enable **Gmail API** for your project.
+3. Configure OAuth consent screen.
+4. Add your Gmail account as a test user.
+5. Create an OAuth Client ID.
+6. Generate a refresh token with this scope:
+
+```text
+https://www.googleapis.com/auth/gmail.send
+```
+
+For a demo project, Google OAuth Playground is often the quickest way to create the token. Use your own OAuth client credentials, authorize the `gmail.send` scope, exchange the code, then copy the refresh token.
+
+If the Google app remains in testing mode, refresh tokens may expire. That is acceptable for a temporary project demo but should be watched.
+
+## Optional Resend Provider
+
+Resend is better for production after you verify a domain:
+
+```env
+EMAIL_PROVIDER=resend
+RESEND_API_KEY=re_xxxxxxxxxxxxxxxxxxxxxxxxx
+EMAIL_FROM=MUJ Research Portal <verify@mail.yourdomain.com>
+```
+
+For quick Resend testing, `onboarding@resend.dev` can send only to the email address attached to your Resend account. It cannot verify arbitrary student or faculty emails.
 
 ## Email Verification Flow
 
@@ -83,10 +103,9 @@ NEXT_PUBLIC_API_URL=
 
 ## Verification Checklist
 
-1. Deploy with MongoDB, JWT, app URL, and Resend variables configured.
-2. Register a new account using your Resend account email while testing with `onboarding@resend.dev`.
-3. Confirm Render logs show `Verification email accepted by Resend: <email-id>`.
-4. Confirm the Resend dashboard shows the email as sent or delivered.
-5. Confirm no user exists in MongoDB before clicking the verification link.
-6. Click the verification link and complete verification.
-7. Confirm the user, profile shell, login activity, and session are created.
+1. Deploy with MongoDB, JWT, app URL, and Gmail API variables configured.
+2. Register a new account with any email address you can access.
+3. Confirm Render logs show `Verification email accepted by Gmail: <message-id>`.
+4. Confirm no user exists in MongoDB before clicking the verification link.
+5. Click the verification link and complete verification.
+6. Confirm the user, profile shell, login activity, and session are created.
