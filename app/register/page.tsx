@@ -14,7 +14,6 @@ import { useToast } from "@/components/ui/use-toast"
 import { AuthBackground } from "@/components/auth-background"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { AlertCircle } from "lucide-react"
-import { getApiUrl } from "@/lib/api-client"
 
 export default function RegisterPage() {
   const searchParams = useSearchParams()
@@ -139,7 +138,7 @@ export default function RegisterPage() {
 
   const handleGoogleSignUp = () => {
     const params = new URLSearchParams({ role })
-    window.location.href = getApiUrl(`/api/auth/google/start?${params.toString()}`)
+    window.location.href = `/api/auth/google/start?${params.toString()}`
   }
 
   return (

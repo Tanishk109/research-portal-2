@@ -6,28 +6,40 @@ export const dynamic = "force-dynamic"
 
 const allowedRoles = new Set(["faculty", "student"])
 
+function getFirstHeaderValue(value: string | null) {
+  return value?.split(",")[0]?.trim() || ""
+}
+
+function getPublicOrigin(request: NextRequest) {
+  const forwardedHost = getFirstHeaderValue(request.headers.get("x-forwarded-host"))
+  const forwardedProto = getFirstHeaderValue(request.headers.get("x-forwarded-proto")) || "https"
+  if (forwardedHost) {
+    return `${forwardedProto}://${forwardedHost}`
+  }
+
+  if (NEXT_PUBLIC_APP_URL) {
+    return NEXT_PUBLIC_APP_URL
+  }
+
+  return request.nextUrl.origin
+}
+
 function getRedirectUri(request: NextRequest) {
   if (GOOGLE_REDIRECT_URI) return GOOGLE_REDIRECT_URI
-  return new URL("/api/auth/google/callback", request.url).toString()
+  return new URL("/api/auth/google/callback", getPublicOrigin(request)).toString()
 }
 
 function getAppUrl(request: NextRequest, path: string) {
-  if (NEXT_PUBLIC_APP_URL) {
-    return new URL(path, NEXT_PUBLIC_APP_URL)
-  }
-
-  const forwardedHost = request.headers.get("x-forwarded-host")
-  const forwardedProto = request.headers.get("x-forwarded-proto") || "https"
-  if (forwardedHost) {
-    return new URL(path, `${forwardedProto}://${forwardedHost}`)
-  }
-
-  return new URL(path, request.url)
+  return new URL(path, getPublicOrigin(request))
 }
 
 export async function GET(request: NextRequest) {
   if (!IS_GOOGLE_AUTH_CONFIGURED) {
     return NextResponse.redirect(getAppUrl(request, "/login?error=google_not_configured"))
+  }
+
+  if (GOOGLE_REDIRECT_URI && new URL(GOOGLE_REDIRECT_URI).origin !== getPublicOrigin(request)) {
+    return NextResponse.redirect(getAppUrl(request, "/login?error=google_redirect_mismatch"))
   }
 
   const role = request.nextUrl.searchParams.get("role") || "student"
