@@ -1,4 +1,5 @@
 import nodemailer from "nodemailer"
+import dns from "dns"
 import {
   EMAIL_FROM,
   IS_SMTP_CONFIGURED,
@@ -16,24 +17,43 @@ type VerificationEmailInput = {
   verificationUrl: string
 }
 
+let dnsConfigured = false
+
 export function ensureEmailConfigured() {
   if (!IS_SMTP_CONFIGURED) {
     throw new Error("Email verification is not configured. Set SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, and EMAIL_FROM.")
   }
 }
 
+function preferIpv4() {
+  if (dnsConfigured) return
+
+  try {
+    dns.setDefaultResultOrder("ipv4first")
+  } catch {
+    // Older Node runtimes may not support this setting; the SMTP socket still asks for IPv4 below.
+  }
+
+  dnsConfigured = true
+}
+
 function createTransport() {
   ensureEmailConfigured()
+  preferIpv4()
 
   return nodemailer.createTransport({
     host: SMTP_HOST,
     port: SMTP_PORT,
     secure: SMTP_SECURE,
+    family: 4,
+    connectionTimeout: 10_000,
+    greetingTimeout: 10_000,
+    socketTimeout: 20_000,
     auth: {
       user: SMTP_USER,
       pass: SMTP_PASSWORD,
     },
-  })
+  } as any)
 }
 
 export function createVerificationUrl(token: string) {
