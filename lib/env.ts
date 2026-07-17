@@ -25,12 +25,15 @@ export const NEXT_PUBLIC_APP_URL = normalizeUrl(
 export const NEXT_PUBLIC_API_URL = normalizeUrl(process.env.NEXT_PUBLIC_API_URL || "")
 export const API_URL = normalizeUrl(NEXT_PUBLIC_API_URL || NEXT_PUBLIC_APP_URL)
 
-// Google OAuth configuration
-export const GOOGLE_CLIENT_ID = normalizeEnv(process.env.GOOGLE_CLIENT_ID)
-export const GOOGLE_CLIENT_SECRET = normalizeEnv(process.env.GOOGLE_CLIENT_SECRET)
-export const GOOGLE_REDIRECT_URI = normalizeUrl(process.env.GOOGLE_REDIRECT_URI)
-export const IS_GOOGLE_AUTH_CONFIGURED =
-  Boolean(GOOGLE_CLIENT_ID) && Boolean(GOOGLE_CLIENT_SECRET) && Boolean(GOOGLE_REDIRECT_URI)
+// Email verification configuration
+export const SMTP_HOST = normalizeEnv(process.env.SMTP_HOST)
+export const SMTP_PORT = Number.parseInt(normalizeEnv(process.env.SMTP_PORT) || "587", 10)
+export const SMTP_SECURE = normalizeEnv(process.env.SMTP_SECURE).toLowerCase() === "true"
+export const SMTP_USER = normalizeEnv(process.env.SMTP_USER)
+export const SMTP_PASSWORD = normalizeEnv(process.env.SMTP_PASSWORD)
+export const EMAIL_FROM = normalizeEnv(process.env.EMAIL_FROM) || SMTP_USER
+export const IS_SMTP_CONFIGURED =
+  Boolean(SMTP_HOST) && Boolean(SMTP_PORT) && Boolean(SMTP_USER) && Boolean(SMTP_PASSWORD) && Boolean(EMAIL_FROM)
 
 if (process.env.NODE_ENV === "production" && !JWT_SECRET) {
   throw new Error("JWT_SECRET is required in production")

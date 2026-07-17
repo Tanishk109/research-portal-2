@@ -5,10 +5,13 @@ import {
   JWT_EXPIRATION,
   IS_DB_CONFIGURED,
   API_URL,
-  GOOGLE_CLIENT_ID,
-  GOOGLE_REDIRECT_URI,
-  IS_GOOGLE_AUTH_CONFIGURED,
+  EMAIL_FROM,
+  IS_SMTP_CONFIGURED,
   NEXT_PUBLIC_APP_URL,
+  SMTP_HOST,
+  SMTP_PORT,
+  SMTP_SECURE,
+  SMTP_USER,
 } from "@/lib/env"
 
 export async function GET() {
@@ -30,9 +33,12 @@ export async function GET() {
       IS_DB_CONFIGURED: IS_DB_CONFIGURED,
       NEXT_PUBLIC_APP_URL: NEXT_PUBLIC_APP_URL || "not configured",
       API_URL: API_URL || "same origin",
-      GOOGLE_CLIENT_ID: GOOGLE_CLIENT_ID ? `${GOOGLE_CLIENT_ID.slice(0, 8)}...` : "Not configured",
-      GOOGLE_REDIRECT_URI: GOOGLE_REDIRECT_URI || "Not configured",
-      IS_GOOGLE_AUTH_CONFIGURED,
+      SMTP_HOST: SMTP_HOST || "Not configured",
+      SMTP_PORT,
+      SMTP_SECURE,
+      SMTP_USER: SMTP_USER ? `${SMTP_USER.slice(0, 3)}...` : "Not configured",
+      EMAIL_FROM: EMAIL_FROM || "Not configured",
+      IS_SMTP_CONFIGURED,
     },
   })
 }

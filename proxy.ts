@@ -26,12 +26,13 @@ const publicPaths = [
   "/",
   "/login",
   "/register",
+  "/verify-email",
   "/about",
   "/api/auth/login",
   "/api/auth/register",
+  "/api/auth/verify-email",
+  "/api/auth/resend-verification",
   "/api/auth/logout",
-  "/api/auth/google/start",
-  "/api/auth/google/callback",
   "/api/health",
 ]
 

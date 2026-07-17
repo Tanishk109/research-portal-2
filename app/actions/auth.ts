@@ -2,12 +2,16 @@
 
 import { cookies } from "next/headers"
 import { redirect } from "next/navigation"
+import crypto from "crypto"
 import { hashPassword, comparePassword, toPlainObject, toObjectId } from "@/lib/db"
 import { connectToMongoDB } from "@/lib/mongodb"
-import { User, LoginActivity, FacultyProfile, StudentProfile } from "@/lib/models"
+import { User, LoginActivity, FacultyProfile, StudentProfile, PendingRegistration } from "@/lib/models"
 import { jwtVerify, SignJWT } from "jose"
 import { nanoid } from "nanoid"
 import { JWT_SECRET, COOKIE_SETTINGS, JWT_EXPIRATION } from "@/lib/env"
+import { createVerificationUrl, sendVerificationEmail } from "@/lib/email"
+
+const VERIFICATION_TOKEN_TTL_MS = 24 * 60 * 60 * 1000
 
 // Get user agent details
 function getUserAgentDetails(userAgent: string) {
@@ -118,109 +122,77 @@ export async function login(formData: FormData) {
 // Register user
 export async function register(formData: FormData) {
   try {
-    console.log("Registration started")
     await connectToMongoDB()
     
-    const role = formData.get("role") as string
-    const firstName = formData.get("firstName") as string
-    const lastName = formData.get("lastName") as string
-    const email = formData.get("email") as string
-    const password = formData.get("password") as string
+    const role = String(formData.get("role") || "")
+    const firstName = String(formData.get("firstName") || "").trim()
+    const lastName = String(formData.get("lastName") || "").trim()
+    const email = String(formData.get("email") || "").trim().toLowerCase()
+    const password = String(formData.get("password") || "")
     const userAgent = (formData.get("userAgent") as string) || "Unknown"
     const ipAddress = (formData.get("ipAddress") as string) || "Unknown"
 
-    // Role-specific fields
-    const facultyId = formData.get("facultyId") as string
-    const department = formData.get("department") as string
-    const specialization = formData.get("specialization") as string
-    const dateOfJoining = formData.get("dateOfJoining") as string
-    const dateOfBirth = formData.get("dateOfBirth") as string
-    const registrationNumber = formData.get("registrationNumber") as string
-    const year = formData.get("year") as string
-    const cgpa = formData.get("cgpa") as string
-
-    // Validate input
     if (!role || !firstName || !lastName || !email || !password) {
-      console.log("Missing required fields")
-      return { success: false, message: "All fields are required" }
+      return { success: false, message: "Name, role, email, and password are required." }
     }
 
-    // Validate role-specific fields
-    if (role === "faculty") {
-      if (!facultyId || !department || !specialization || !dateOfJoining || !dateOfBirth) {
-        console.log("Missing faculty-specific fields")
-        return { success: false, message: "All faculty fields are required" }
-      }
-    } else if (role === "student") {
-      if (!registrationNumber || !department || !year || !cgpa) {
-        console.log("Missing student-specific fields")
-        return { success: false, message: "All student fields are required" }
-      }
-    } else {
-      console.log(`Invalid role: ${role}`)
+    if (role !== "faculty" && role !== "student") {
       return { success: false, message: "Invalid role" }
     }
 
-    console.log(`Registration attempt for email: ${email}, role: ${role}`)
+    if (password.length < 8) {
+      return { success: false, message: "Password must be at least 8 characters." }
+    }
 
-    // Check if email already exists
     const existingUser = await User.findOne({ email })
 
     if (existingUser) {
-      console.log(`Email already exists: ${email}`)
       return { success: false, message: "Email already in use" }
     }
 
-    // Hash password
-    const hashedPassword = await hashPassword(password)
+    const verificationToken = crypto.randomBytes(32).toString("base64url")
+    const verificationTokenHash = crypto.createHash("sha256").update(verificationToken).digest("hex")
+    const now = new Date()
 
-    // Create user
-    const user = await User.create({
-      role: role as "faculty" | "student",
-      first_name: firstName,
-      last_name: lastName,
-      email,
-      password_hash: hashedPassword,
+    await PendingRegistration.findOneAndUpdate(
+      { email },
+      {
+        $set: {
+          role,
+          first_name: firstName,
+          last_name: lastName,
+          email,
+          password_hash: await hashPassword(password),
+          verification_token_hash: verificationTokenHash,
+          expires_at: new Date(now.getTime() + VERIFICATION_TOKEN_TTL_MS),
+          last_sent_at: now,
+          ip_address: ipAddress,
+          user_agent: userAgent,
+        },
+        $setOnInsert: {
+          created_at: now,
+        },
+      },
+      { upsert: true, new: true, setDefaultsOnInsert: true },
+    )
+
+    await sendVerificationEmail({
+      to: email,
+      name: `${firstName} ${lastName}`,
+      verificationUrl: createVerificationUrl(verificationToken),
     })
 
-    // Create role-specific profile
-    if (role === "faculty") {
-      await FacultyProfile.create({
-        user_id: user._id,
-        faculty_id: facultyId,
-        department,
-        specialization,
-        date_of_joining: new Date(dateOfJoining),
-        date_of_birth: new Date(dateOfBirth),
-      })
-    } else if (role === "student") {
-      await StudentProfile.create({
-        user_id: user._id,
-        registration_number: registrationNumber,
-        department,
-        year,
-        cgpa: Number.parseFloat(cgpa),
-      })
-    }
-
-    // Get user agent details
-    const { deviceType } = getUserAgentDetails(userAgent)
-
-    // Record successful registration as a login
-    await LoginActivity.create({
-      user_id: user._id,
-      timestamp: new Date(),
-      ip_address: ipAddress,
-      user_agent: userAgent,
+    return {
       success: true,
-      device_type: deviceType,
-    })
-
-    const userData = toPlainObject(user)
-    return userData
+      message: "A verification link has been sent to your email. Please verify your email to finish creating your account.",
+      data: { email },
+    }
   } catch (error) {
     console.error("Registration error:", error)
-    return { success: false, message: "Registration failed" }
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Registration failed",
+    }
   }
 }
 
@@ -228,15 +200,10 @@ export async function register(formData: FormData) {
 export async function registerFaculty(data: any) {
   const formData = new FormData()
   formData.set("role", "faculty")
-  formData.set("firstName", data.firstName)
-  formData.set("lastName", data.lastName)
-  formData.set("email", data.email)
-  formData.set("password", data.password)
-  formData.set("facultyId", data.facultyId)
-  formData.set("department", data.department)
-  formData.set("specialization", data.specialization)
-  formData.set("dateOfJoining", data.doj)
-  formData.set("dateOfBirth", data.dob)
+  formData.set("firstName", data.firstName || "")
+  formData.set("lastName", data.lastName || "")
+  formData.set("email", data.email || "")
+  formData.set("password", data.password || "")
 
   return register(formData)
 }
@@ -245,14 +212,10 @@ export async function registerFaculty(data: any) {
 export async function registerStudent(data: any) {
   const formData = new FormData()
   formData.set("role", "student")
-  formData.set("firstName", data.firstName)
-  formData.set("lastName", data.lastName)
-  formData.set("email", data.email)
-  formData.set("password", data.password)
-  formData.set("registrationNumber", data.registrationNumber)
-  formData.set("department", data.department)
-  formData.set("year", data.year)
-  formData.set("cgpa", data.cgpa)
+  formData.set("firstName", data.firstName || "")
+  formData.set("lastName", data.lastName || "")
+  formData.set("email", data.email || "")
+  formData.set("password", data.password || "")
 
   return register(formData)
 }

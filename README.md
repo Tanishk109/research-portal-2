@@ -126,6 +126,7 @@ The application uses MongoDB collections managed through Mongoose schemas.
 | Collection | Purpose |
 |---|---|
 | `users` | Shared identity, role, credentials, and profile image metadata |
+| `pendingregistrations` | Unverified account requests and expiring email-verification tokens |
 | `facultyprofiles` | Faculty ID, department, specialization, biography, and institutional details |
 | `studentprofiles` | Registration number, department, academic year, CGPA, and student details |
 | `projects` | Research opportunity description, requirements, dates, status, capacity, and tags |
@@ -263,17 +264,25 @@ Open [http://localhost:3000](http://localhost:3000).
 | `JWT_EXPIRATION` | No | Token lifetime; defaults to `7d` |
 | `NEXT_PUBLIC_APP_URL` | Production | Canonical public URL of the application |
 | `NEXT_PUBLIC_API_URL` | Usually no | Only needed when the API is hosted separately |
+| `SMTP_HOST` | Yes | SMTP server used for verification emails |
+| `SMTP_PORT` | Yes | SMTP port, usually `587` for STARTTLS |
+| `SMTP_SECURE` | Yes | Use `true` for implicit TLS ports such as `465`; otherwise `false` |
+| `SMTP_USER` | Yes | SMTP login email or username |
+| `SMTP_PASSWORD` | Yes | SMTP password or provider app password |
+| `EMAIL_FROM` | Yes | Sender address shown on verification emails |
 
 ## Authentication and Access Control
 
-The portal uses credential-based authentication backed by MongoDB.
+The portal uses credential-based authentication backed by MongoDB and email verification.
 
-1. Passwords are hashed with bcrypt before storage.
-2. Successful login creates a signed JWT containing the user ID, role, email, and display information.
-3. The token is stored in an HTTP-only session cookie.
-4. Route guards use the session to protect student, faculty, admin, and authenticated API paths.
-5. Server-side operations perform additional role and ownership checks before modifying data.
-6. Login attempts are recorded for account-security visibility.
+1. Registration stores a pending registration and sends a verification email.
+2. The real user and role-specific profile shell are created only after email verification.
+3. Passwords are hashed with bcrypt before storage.
+4. Successful verification or login creates a signed JWT containing the user ID, role, email, and display information.
+5. The token is stored in an HTTP-only session cookie.
+6. Route guards use the session to protect student, faculty, admin, and authenticated API paths.
+7. Server-side operations perform additional role and ownership checks before modifying data.
+8. Login attempts are recorded for account-security visibility.
 
 ## API Overview
 
@@ -313,6 +322,12 @@ JWT_SECRET=your_production_jwt_secret
 JWT_EXPIRATION=7d
 NEXT_PUBLIC_APP_URL=https://research-portal-2-tvgq.onrender.com
 NEXT_PUBLIC_API_URL=
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER=your_email@gmail.com
+SMTP_PASSWORD=your_gmail_app_password
+EMAIL_FROM=your_email@gmail.com
 ```
 
 Redeploy the service after modifying environment variables.
@@ -331,7 +346,7 @@ Redeploy the service after modifying environment variables.
 ## Production Readiness Roadmap
 
 - Move résumé, certificate, and profile-image storage to Cloudinary, Amazon S3, or another object-storage service.
-- Add email verification and password-reset workflows.
+- Add password-reset workflows.
 - Introduce rate limiting, audit logging, and stronger abuse protection.
 - Add automated unit, integration, and end-to-end tests.
 - Add faculty identity verification or institution-managed onboarding.

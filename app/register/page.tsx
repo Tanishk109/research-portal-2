@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { useState, useEffect } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -13,7 +13,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { useToast } from "@/components/ui/use-toast"
 import { AuthBackground } from "@/components/auth-background"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { AlertCircle } from "lucide-react"
+import { AlertCircle, CheckCircle2, Mail } from "lucide-react"
 
 export default function RegisterPage() {
   const searchParams = useSearchParams()
@@ -24,9 +24,10 @@ export default function RegisterPage() {
   const [password, setPassword] = useState("")
 
   const [loading, setLoading] = useState(false)
+  const [resending, setResending] = useState(false)
   const [error, setError] = useState("")
+  const [verificationEmail, setVerificationEmail] = useState("")
   const { toast } = useToast()
-  const router = useRouter()
 
   // Get client IP address
   const [ipAddress, setIpAddress] = useState("unknown")
@@ -88,17 +89,13 @@ export default function RegisterPage() {
       console.log("Registration response:", data)
 
       if (data.success) {
+        const normalizedEmail = data.data?.email || email
+        setVerificationEmail(normalizedEmail)
+        setPassword("")
         toast({
-          title: "Registration successful",
-          description: "Your account has been created. Complete your profile to unlock portal actions.",
+          title: "Verification email sent",
+          description: "Open the link in your inbox to finish creating your account.",
         })
-
-        // Redirect based on user role
-        if (role === "faculty") {
-          router.push("/dashboard/faculty")
-        } else {
-          router.push("/dashboard/student")
-        }
       } else {
         setError(data.message || "An error occurred during registration")
         toast({
@@ -121,9 +118,84 @@ export default function RegisterPage() {
     }
   }
 
-  const handleGoogleSignUp = () => {
-    const params = new URLSearchParams({ role })
-    window.location.href = `/api/auth/google/start?${params.toString()}`
+  const handleResend = async () => {
+    if (!verificationEmail) return
+
+    setResending(true)
+    setError("")
+
+    try {
+      const response = await fetch("/api/auth/resend-verification", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email: verificationEmail }),
+      })
+      const data = await response.json()
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || "Unable to resend verification email.")
+      }
+
+      toast({
+        title: "Verification email sent",
+        description: "Please check your inbox again.",
+      })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to resend verification email."
+      setError(message)
+      toast({
+        variant: "destructive",
+        title: "Resend failed",
+        description: message,
+      })
+    } finally {
+      setResending(false)
+    }
+  }
+
+  if (verificationEmail) {
+    return (
+      <div className="flex min-h-screen items-center justify-center py-10">
+        <AuthBackground />
+        <Card className="w-full max-w-lg z-10">
+          <CardHeader className="space-y-3 text-center">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
+              <Mail className="h-6 w-6" />
+            </div>
+            <CardTitle className="text-2xl font-bold">Check your inbox</CardTitle>
+            <CardDescription>
+              We sent a verification link to {verificationEmail}. Your account will be created after you verify this email address.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {error && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>Error</AlertTitle>
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+            <Alert>
+              <CheckCircle2 className="h-4 w-4" />
+              <AlertTitle>Almost done</AlertTitle>
+              <AlertDescription>
+                Open the email and click the verification link. You will be signed in automatically after verification.
+              </AlertDescription>
+            </Alert>
+          </CardContent>
+          <CardFooter className="flex flex-col gap-3">
+            <Button type="button" className="w-full" onClick={handleResend} disabled={resending}>
+              {resending ? "Sending..." : "Resend verification email"}
+            </Button>
+            <Button type="button" variant="outline" className="w-full" asChild>
+              <Link href="/login">Back to login</Link>
+            </Button>
+          </CardFooter>
+        </Card>
+      </div>
+    )
   }
 
   return (
@@ -190,10 +262,7 @@ export default function RegisterPage() {
           </CardContent>
           <CardFooter className="flex flex-col space-y-4">
             <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Creating account..." : "Register"}
-            </Button>
-            <Button type="button" variant="outline" className="w-full" onClick={handleGoogleSignUp} disabled={loading}>
-              Continue with Google
+              {loading ? "Sending verification email..." : "Register"}
             </Button>
             <div className="text-center text-sm">
               Already have an account?{" "}

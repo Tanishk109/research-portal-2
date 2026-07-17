@@ -29,7 +29,12 @@ export async function PUT(request: Request) {
     if (!result.success) {
       return NextResponse.json({ success: false, message: result.message }, { status: 400 });
     }
-    return NextResponse.json({ success: true, message: result.message });
+    const profileResult = await getCurrentUserProfile();
+    return NextResponse.json({
+      success: true,
+      message: result.message,
+      profile: profileResult.success ? profileResult.profile : null,
+    });
   } catch (error) {
     return NextResponse.json({ success: false, message: "Failed to update profile" }, { status: 500 });
   }

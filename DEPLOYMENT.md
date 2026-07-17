@@ -1,19 +1,12 @@
-# Deployment: Vercel, Render, MongoDB, and Google Auth
+# Deployment: Vercel, Render, MongoDB, and Email Verification
 
-## Recommended setup
+## Recommended Setup
 
-This project is a full-stack Next.js app: pages, API routes, middleware, auth cookies, and server actions all live in the same app.
+This is a full-stack Next.js app. Pages, API routes, server actions, auth cookies, uploads, and MongoDB access all live in the same service.
 
-Recommended:
+For the least friction, deploy the full app on one primary domain, either Vercel or Render. The authentication cookie is HTTP-only and same-site, so keeping the dashboard and API on the same host avoids cross-domain session problems.
 
-- Deploy the full Next.js app on one primary host, either Vercel or Render.
-- Use MongoDB Atlas for persistent data.
-- Keep `NEXT_PUBLIC_API_URL` empty unless you intentionally split the API from the frontend.
-- Keep Google OAuth start, callback, and dashboard on the same public domain.
-
-The current authentication model uses an HTTP-only `session` cookie. For the least trouble, keep the dashboard, API routes, and auth routes on the same public domain.
-
-## Environment variables
+## Required Environment Variables
 
 Set these in your hosting platform:
 
@@ -23,9 +16,13 @@ JWT_SECRET=<long-random-secret-at-least-32-chars>
 JWT_EXPIRATION=7d
 NEXT_PUBLIC_APP_URL=https://your-production-domain.com
 NEXT_PUBLIC_API_URL=
-GOOGLE_CLIENT_ID=<google-client-id>
-GOOGLE_CLIENT_SECRET=<google-client-secret>
-GOOGLE_REDIRECT_URI=https://your-production-domain.com/api/auth/google/callback
+
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER=your_email@gmail.com
+SMTP_PASSWORD=your_gmail_app_password
+EMAIL_FROM=your_email@gmail.com
 ```
 
 For local development:
@@ -36,59 +33,51 @@ JWT_SECRET=<long-random-secret-at-least-32-chars>
 JWT_EXPIRATION=7d
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 NEXT_PUBLIC_API_URL=
-GOOGLE_CLIENT_ID=<google-client-id>
-GOOGLE_CLIENT_SECRET=<google-client-secret>
-GOOGLE_REDIRECT_URI=http://localhost:3000/api/auth/google/callback
+
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER=your_email@gmail.com
+SMTP_PASSWORD=your_gmail_app_password
+EMAIL_FROM=your_email@gmail.com
 ```
 
-## Google Cloud Console
+## Email Verification
 
-In Google Cloud Console -> APIs & Services -> Credentials -> OAuth 2.0 Client:
+Registration does not create a user immediately. It creates a pending registration in MongoDB, sends a verification email, and creates the real user, profile shell, login activity, and session cookie only after the verification link is confirmed.
 
-- Application type: `Web application`
-- Authorized JavaScript origins:
-  - `https://your-production-domain.com`
-- Authorized redirect URIs:
-  - `https://your-production-domain.com/api/auth/google/callback`
-
-For local development, also add:
-
-- `http://localhost:3000`
-- `http://localhost:3000/api/auth/google/callback`
-
-The redirect URI must match `GOOGLE_REDIRECT_URI` exactly.
+If you use Gmail SMTP, `SMTP_PASSWORD` must be a Gmail App Password. A normal Gmail password will not work and should never be committed or pasted into source files.
 
 ## Render
 
-Render detects the app port automatically. If needed, use:
+Render detects the app port automatically. If needed, set:
 
 ```text
 PORT=10000
 ```
 
-Set `NEXT_PUBLIC_APP_URL` and `GOOGLE_REDIRECT_URI` to your Render URL:
+Use your Render service URL as the public app URL:
 
 ```env
 NEXT_PUBLIC_APP_URL=https://your-render-service.onrender.com
-GOOGLE_REDIRECT_URI=https://your-render-service.onrender.com/api/auth/google/callback
+NEXT_PUBLIC_API_URL=
 ```
 
 ## Vercel
 
-Set `NEXT_PUBLIC_APP_URL` and `GOOGLE_REDIRECT_URI` to your Vercel production URL or custom domain:
+Use your Vercel production URL or custom domain as the public app URL:
 
 ```env
 NEXT_PUBLIC_APP_URL=https://your-project.vercel.app
-GOOGLE_REDIRECT_URI=https://your-project.vercel.app/api/auth/google/callback
+NEXT_PUBLIC_API_URL=
 ```
 
-## Verification
+## Verification Checklist
 
-After deployment:
-
-1. Open `/api/env-check` while authenticated and confirm MongoDB, JWT, app URL, and Google values are configured.
-2. Open `/login`.
-3. Click Google sign-in for student or faculty.
-4. Google should return to `/api/auth/google/callback`, create or find the MongoDB user, set the `session` cookie, and redirect to the correct dashboard.
-5. Complete the required profile fields.
-6. Test project creation as faculty and project application as student.
+1. Deploy with MongoDB, JWT, app URL, and SMTP variables configured.
+2. Register a new student account with name, email, and password.
+3. Confirm no user appears in `users` until the email link is verified.
+4. Open the verification link and confirm it redirects to the student dashboard.
+5. Repeat for a faculty account.
+6. Complete required profile fields before creating projects or applying.
+7. Open `/api/env-check` while authenticated and confirm MongoDB, JWT, app URL, and SMTP status are configured.

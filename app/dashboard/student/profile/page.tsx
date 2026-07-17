@@ -44,6 +44,21 @@ function dataUrlToBlobUrl(dataUrl: string) {
   return URL.createObjectURL(new Blob([bytes], { type: mimeType }))
 }
 
+function mapStudentProfile(profile: any): StudentProfileData {
+  return {
+    firstName: profile.first_name || "",
+    lastName: profile.last_name || "",
+    email: profile.email || "",
+    profilePictureUrl: profile.profile_picture_url || "",
+    registrationNumber: profile.registration_number || "",
+    department: profile.department || "",
+    year: profile.year || "",
+    cgpa: profile.cgpa || 0,
+    phone: profile.phone || "",
+    bio: profile.bio || "",
+  }
+}
+
 export default function StudentProfilePage() {
   const { toast } = useToast()
   const [loading, setLoading] = useState(true)
@@ -97,18 +112,7 @@ export default function StudentProfilePage() {
       const res = await fetch("/api/dashboard/student/profile")
       const result = await res.json()
       if (res.ok && result.success && result.profile) {
-        setProfileData({
-          firstName: result.profile.first_name || "",
-          lastName: result.profile.last_name || "",
-          email: result.profile.email || "",
-          profilePictureUrl: result.profile.profile_picture_url || "",
-          registrationNumber: result.profile.registration_number || "",
-          department: result.profile.department || "",
-          year: result.profile.year || "",
-          cgpa: result.profile.cgpa || 0,
-          phone: result.profile.phone || "",
-          bio: result.profile.bio || ""
-        })
+        setProfileData(mapStudentProfile(result.profile))
       } else {
         toast({
           title: "Error",
@@ -258,7 +262,9 @@ export default function StudentProfilePage() {
       })
       const result = await res.json()
       if (res.ok && result.success) {
-        await loadProfile()
+        if (result.profile) {
+          setProfileData(mapStudentProfile(result.profile))
+        }
         toast({
           title: "Success",
           description: "Profile updated successfully",
@@ -636,19 +642,19 @@ export default function StudentProfilePage() {
                               id="first-name" 
                               className="bg-white/90"
                               value={profileData.firstName}
-                              onChange={(e) => setProfileData({...profileData, firstName: e.target.value})}
+                              onChange={(e) => setProfileData((prev) => ({ ...prev, firstName: e.target.value }))}
                               disabled={loading}
                             />
                           </div>
                           <div className="space-y-2">
                             <Label htmlFor="last-name">Last Name</Label>
                             <Input 
-                              id="last-name" 
-                              className="bg-white/90"
-                              value={profileData.lastName}
-                              onChange={(e) => setProfileData({...profileData, lastName: e.target.value})}
-                              disabled={loading}
-                            />
+                             id="last-name" 
+                             className="bg-white/90"
+                             value={profileData.lastName}
+                              onChange={(e) => setProfileData((prev) => ({ ...prev, lastName: e.target.value }))}
+                             disabled={loading}
+                           />
                           </div>
                         </div>
                         <div className="space-y-2">
@@ -658,7 +664,7 @@ export default function StudentProfilePage() {
                             type="email" 
                             className="bg-white/90"
                             value={profileData.email}
-                            onChange={(e) => setProfileData({...profileData, email: e.target.value})}
+                            onChange={(e) => setProfileData((prev) => ({ ...prev, email: e.target.value }))}
                             disabled={loading}
                           />
                       </div>
@@ -668,7 +674,7 @@ export default function StudentProfilePage() {
                             id="reg-number" 
                             className="bg-white/90"
                             value={profileData.registrationNumber}
-                            onChange={(e) => setProfileData({...profileData, registrationNumber: e.target.value})}
+                            onChange={(e) => setProfileData((prev) => ({ ...prev, registrationNumber: e.target.value }))}
                             disabled={loading}
                           />
                       </div>
@@ -677,7 +683,7 @@ export default function StudentProfilePage() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="department">Department</Label>
-                      <Select value={profileData.department} onValueChange={(value) => setProfileData({...profileData, department: value})} disabled={loading}>
+                      <Select value={profileData.department} onValueChange={(value) => setProfileData((prev) => ({ ...prev, department: value }))} disabled={loading}>
                         <SelectTrigger id="department" className="bg-white/90">
                           <SelectValue placeholder="Select department" />
                         </SelectTrigger>
@@ -692,7 +698,7 @@ export default function StudentProfilePage() {
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="year">Current Year</Label>
-                      <Select value={profileData.year} onValueChange={(value) => setProfileData({...profileData, year: value})} disabled={loading}>
+                      <Select value={profileData.year} onValueChange={(value) => setProfileData((prev) => ({ ...prev, year: value }))} disabled={loading}>
                         <SelectTrigger id="year" className="bg-white/90">
                           <SelectValue placeholder="Select year" />
                         </SelectTrigger>
@@ -718,7 +724,7 @@ export default function StudentProfilePage() {
                         min="0" 
                         max="10" 
                         value={profileData.cgpa}
-                        onChange={(e) => setProfileData({...profileData, cgpa: parseFloat(e.target.value) || 0})}
+                        onChange={(e) => setProfileData((prev) => ({ ...prev, cgpa: parseFloat(e.target.value) || 0 }))}
                         disabled={loading}
                       />
                     </div>
@@ -729,7 +735,7 @@ export default function StudentProfilePage() {
                         type="tel" 
                         className="bg-white/90"
                         value={profileData.phone}
-                        onChange={(e) => setProfileData({...profileData, phone: e.target.value})}
+                        onChange={(e) => setProfileData((prev) => ({ ...prev, phone: e.target.value }))}
                         disabled={loading}
                       />
                     </div>
@@ -742,13 +748,13 @@ export default function StudentProfilePage() {
                       placeholder="Write a short bio about yourself..."
                       className="min-h-[100px] bg-white/90"
                       value={profileData.bio}
-                      onChange={(e) => setProfileData({...profileData, bio: e.target.value})}
+                      onChange={(e) => setProfileData((prev) => ({ ...prev, bio: e.target.value }))}
                       disabled={loading}
                     />
                   </div>
                 </CardContent>
                 <CardFooter className="flex justify-end">
-                  <Button onClick={handleSaveProfile} disabled={saving} className="bg-primary hover:bg-primary/90">
+                  <Button type="button" onClick={handleSaveProfile} disabled={saving} className="bg-primary hover:bg-primary/90">
                     {saving ? "Saving..." : "Save Changes"}
                   </Button>
                 </CardFooter>

@@ -5,7 +5,7 @@ import { User, FacultyProfile, StudentProfile, LoginActivity } from "@/lib/model
 import { comparePassword, toPlainObject } from "@/lib/db"
 import { SignJWT } from "jose"
 import { nanoid } from "nanoid"
-import { JWT_SECRET, JWT_EXPIRATION } from "@/lib/env"
+import { COOKIE_SETTINGS, JWT_SECRET, JWT_EXPIRATION } from "@/lib/env"
 
 // Force dynamic rendering for this route (uses cookies)
 export const dynamic = 'force-dynamic'
@@ -112,14 +112,7 @@ export async function POST(request: NextRequest) {
     })
 
     // Set cookie on the response
-    response.cookies.set("session", token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-      path: "/",
-      // Don't set domain - let browser handle it
-    })
+    response.cookies.set("session", token, COOKIE_SETTINGS)
     
     // Also set a header to indicate cookie was set (for debugging)
     response.headers.set("X-Session-Set", "true")

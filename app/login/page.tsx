@@ -19,8 +19,6 @@ import { api, endpoints, getClientIpAddress } from "@/lib/api-client"
 export default function LoginPage() {
   const searchParams = useSearchParams()
   const defaultRole = searchParams?.get("role") || "faculty"
-  const authError = searchParams?.get("error") || ""
-  const redirectTo = searchParams?.get("redirect") || ""
   const [isLoading, setIsLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [activeTab, setActiveTab] = useState(defaultRole)
@@ -41,24 +39,6 @@ export default function LoginPage() {
   useEffect(() => {
     setActiveTab(defaultRole)
   }, [defaultRole])
-
-  useEffect(() => {
-    if (!authError) return
-
-    const messages: Record<string, string> = {
-      google_not_configured: "Google authentication is not configured.",
-      google_access_denied: "Google authentication was cancelled.",
-      google_state_invalid: "The Google login request expired. Please try again.",
-      google_email_unverified: "Google could not verify this email address.",
-      google_auth_failed: "Google authentication failed. Please try again.",
-    }
-
-    toast({
-      title: "Google sign-in unavailable",
-      description: messages[authError] || "Google authentication could not be completed.",
-      variant: "destructive",
-    })
-  }, [authError])
 
   // Get client IP address
   useEffect(() => {
@@ -141,16 +121,6 @@ export default function LoginPage() {
     } finally {
       setIsLoading(false)
     }
-  }
-
-  const handleGoogleSignIn = (role: "faculty" | "student") => {
-    const params = new URLSearchParams({ role })
-
-    if (redirectTo.startsWith("/") && !redirectTo.startsWith("//")) {
-      params.set("redirect", redirectTo)
-    }
-
-    window.location.href = `/api/auth/google/start?${params.toString()}`
   }
 
   return (
@@ -248,15 +218,6 @@ export default function LoginPage() {
                             "Sign in"
                           )}
                         </Button>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          className="w-full"
-                          onClick={() => handleGoogleSignIn("faculty")}
-                          disabled={isLoading}
-                        >
-                          Continue with Google
-                        </Button>
                       </div>
                     </CardFooter>
                   </form>
@@ -323,15 +284,6 @@ export default function LoginPage() {
                           ) : (
                             "Sign in"
                           )}
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          className="w-full"
-                          onClick={() => handleGoogleSignIn("student")}
-                          disabled={isLoading}
-                        >
-                          Continue with Google
                         </Button>
                       </div>
                     </CardFooter>

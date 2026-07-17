@@ -8,8 +8,7 @@ export interface IUser {
   last_name: string;
   email: string;
   password_hash: string;
-  google_id?: string;
-  auth_provider?: "credentials" | "google";
+  email_verified_at?: Date;
   profile_picture_url?: string;
   created_at?: Date;
   updated_at?: Date;
@@ -22,14 +21,50 @@ const UserSchema = new Schema<IUser>(
     last_name: { type: String, required: true, maxlength: 100 },
     email: { type: String, required: true, unique: true, index: true, maxlength: 255 },
     password_hash: { type: String, required: true },
-    google_id: { type: String, unique: true, sparse: true, index: true },
-    auth_provider: { type: String, enum: ["credentials", "google"], default: "credentials" },
+    email_verified_at: { type: Date },
     profile_picture_url: { type: String },
     created_at: { type: Date, default: Date.now },
     updated_at: { type: Date, default: Date.now },
   },
   { timestamps: { createdAt: "created_at", updatedAt: "updated_at" } }
 );
+
+// Pending registration schema. Users are created only after email verification.
+export interface IPendingRegistration {
+  _id?: string;
+  role: "faculty" | "student";
+  first_name: string;
+  last_name: string;
+  email: string;
+  password_hash: string;
+  verification_token_hash: string;
+  expires_at: Date;
+  last_sent_at: Date;
+  ip_address?: string;
+  user_agent?: string;
+  created_at?: Date;
+  updated_at?: Date;
+}
+
+const PendingRegistrationSchema = new Schema<IPendingRegistration>(
+  {
+    role: { type: String, enum: ["faculty", "student"], required: true, index: true },
+    first_name: { type: String, required: true, maxlength: 100 },
+    last_name: { type: String, required: true, maxlength: 100 },
+    email: { type: String, required: true, unique: true, index: true, maxlength: 255 },
+    password_hash: { type: String, required: true },
+    verification_token_hash: { type: String, required: true, unique: true, index: true },
+    expires_at: { type: Date, required: true },
+    last_sent_at: { type: Date, required: true, default: Date.now },
+    ip_address: { type: String, maxlength: 45 },
+    user_agent: { type: String },
+    created_at: { type: Date, default: Date.now },
+    updated_at: { type: Date, default: Date.now },
+  },
+  { timestamps: { createdAt: "created_at", updatedAt: "updated_at" } }
+);
+
+PendingRegistrationSchema.index({ expires_at: 1 }, { expireAfterSeconds: 0 });
 
 // Faculty Profile Schema
 export interface IFacultyProfile {
@@ -288,6 +323,7 @@ function getModel<T>(name: string, schema: Schema<T>): Model<T> {
 }
 
 export const User = getModel<IUser>("User", UserSchema);
+export const PendingRegistration = getModel<IPendingRegistration>("PendingRegistration", PendingRegistrationSchema);
 export const FacultyProfile = getModel<IFacultyProfile>("FacultyProfile", FacultyProfileSchema);
 export const StudentProfile = getModel<IStudentProfile>("StudentProfile", StudentProfileSchema);
 export const StudentCV = getModel<IStudentCV>("StudentCV", StudentCVSchema);

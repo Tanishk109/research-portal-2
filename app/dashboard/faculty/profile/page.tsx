@@ -44,6 +44,22 @@ function readFileAsDataUrl(file: File) {
   })
 }
 
+function mapFacultyProfile(profile: any): FacultyProfileData {
+  return {
+    firstName: profile.first_name || "",
+    lastName: profile.last_name || "",
+    email: profile.email || "",
+    profilePictureUrl: profile.profile_picture_url || "",
+    facultyId: profile.faculty_id || "",
+    department: profile.department || "",
+    specialization: profile.specialization || "",
+    dateOfJoining: formatDateInputValue(profile.date_of_joining),
+    dateOfBirth: formatDateInputValue(profile.date_of_birth),
+    phone: profile.phone || "",
+    bio: profile.bio || "",
+  }
+}
+
 export default function FacultyProfilePage() {
   const searchParams = useSearchParams()
   const [isLoading, setIsLoading] = useState(true)
@@ -76,20 +92,7 @@ export default function FacultyProfilePage() {
       const result = await res.json()
       
       if (res.ok && result.success && result.profile) {
-        const profileData = result.profile
-        setFormData({
-          firstName: (profileData as any).first_name || "",
-          lastName: (profileData as any).last_name || "",
-          email: profileData.email || "",
-          profilePictureUrl: (profileData as any).profile_picture_url || "",
-          facultyId: (profileData as any).faculty_id || "",
-          department: profileData.department || "",
-          specialization: profileData.specialization || "",
-          dateOfJoining: formatDateInputValue((profileData as any).date_of_joining),
-          dateOfBirth: formatDateInputValue((profileData as any).date_of_birth),
-          phone: profileData.phone || "",
-          bio: profileData.bio || "",
-        })
+        setFormData(mapFacultyProfile(result.profile))
       } else {
         toast.error("Failed to load profile")
       }
@@ -113,7 +116,9 @@ export default function FacultyProfilePage() {
       
       if (res.ok && result.success) {
         toast.success("Profile updated successfully")
-        await loadProfile() // Reload to get updated data
+        if (result.profile) {
+          setFormData(mapFacultyProfile(result.profile))
+        }
       } else {
         toast.error(result.message || "Failed to update profile")
       }
@@ -214,7 +219,7 @@ export default function FacultyProfilePage() {
                   Keep your academic identity, contact details, and research background current across the portal.
                 </p>
               </div>
-              <Button onClick={handleSave} disabled={isSaving} className="w-full bg-white text-slate-950 shadow-lg shadow-slate-950/20 hover:bg-slate-100 md:w-auto">
+              <Button type="button" onClick={handleSave} disabled={isSaving} className="w-full bg-white text-slate-950 shadow-lg shadow-slate-950/20 hover:bg-slate-100 md:w-auto">
                 {isSaving ? "Saving..." : "Save Changes"}
               </Button>
             </div>
@@ -402,7 +407,7 @@ export default function FacultyProfilePage() {
             </div>
           </CardContent>
           <div className="flex justify-end border-t border-slate-200/80 px-6 py-4">
-            <Button onClick={handleSave} disabled={isSaving}>
+            <Button type="button" onClick={handleSave} disabled={isSaving}>
               {isSaving ? "Saving..." : "Save Changes"}
             </Button>
           </div>
