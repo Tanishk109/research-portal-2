@@ -1,7 +1,7 @@
 "use server"
 
 import { connectToMongoDB } from "@/lib/mongodb"
-import { User, FacultyProfile, StudentProfile } from "@/lib/models"
+import { FacultyProfile, StudentCV, StudentProfile, StudentSkill, User } from "@/lib/models"
 import { getCurrentUser } from "./auth"
 import { revalidatePath } from "next/cache"
 import { toObjectId } from "@/lib/db"
@@ -53,6 +53,83 @@ function getProfilePictureUpdate(profilePictureUrl: string | undefined) {
   }
 
   return { success: true as const, value: profilePictureUrl }
+}
+
+type UserProfileIdentity = {
+  id: string
+  role: string
+}
+
+function hasValue(value: unknown) {
+  return String(value ?? "").trim().length > 0
+}
+
+export async function getUserProfileCompletionStatus(user: UserProfileIdentity) {
+  await connectToMongoDB()
+
+  const userId = toObjectId(user.id)
+  if (!userId) {
+    return { success: false, complete: false, role: user.role, missing: ["Valid user account"] }
+  }
+
+  const account = await User.findById(userId).lean()
+  if (!account) {
+    return { success: false, complete: false, role: user.role, missing: ["User account"] }
+  }
+
+  if (user.role === "faculty") {
+    const profile = await FacultyProfile.findOne({ user_id: userId }).lean()
+    const checks = [
+      ["First name", account.first_name],
+      ["Last name", account.last_name],
+      ["Email", account.email],
+      ["Professional picture", account.profile_picture_url],
+      ["Faculty ID", profile?.faculty_id],
+      ["Department", profile?.department],
+      ["Specialization", profile?.specialization],
+      ["Date of joining", profile?.date_of_joining],
+      ["Date of birth", profile?.date_of_birth],
+      ["Phone", (profile as any)?.phone],
+      ["Bio", (profile as any)?.bio],
+    ] as const
+    const missing = checks.filter(([, value]) => !hasValue(value)).map(([label]) => label)
+    return { success: true, complete: missing.length === 0, role: "faculty", missing }
+  }
+
+  if (user.role === "student") {
+    const [profile, resume, skillCount] = await Promise.all([
+      StudentProfile.findOne({ user_id: userId }).lean(),
+      StudentCV.findOne({ user_id: userId }).lean(),
+      StudentSkill.countDocuments({ user_id: userId }),
+    ])
+    const checks = [
+      ["First name", account.first_name],
+      ["Last name", account.last_name],
+      ["Email", account.email],
+      ["Professional picture", account.profile_picture_url],
+      ["Registration number", profile?.registration_number],
+      ["Department", profile?.department],
+      ["Year", profile?.year],
+      ["CGPA", profile?.cgpa],
+      ["Phone", (profile as any)?.phone],
+      ["Bio", (profile as any)?.bio],
+      ["Resume", resume?.file_url],
+      ["At least one skill", skillCount > 0 ? "yes" : ""],
+    ] as const
+    const missing = checks.filter(([, value]) => !hasValue(value)).map(([label]) => label)
+    return { success: true, complete: missing.length === 0, role: "student", missing }
+  }
+
+  return { success: false, complete: false, role: user.role, missing: ["Valid role"] }
+}
+
+export async function getCurrentProfileCompletionStatus() {
+  const currentUserResult = await getCurrentUser()
+  if (!currentUserResult.success) {
+    return { success: false, complete: false, role: null, missing: ["Authenticated session"] }
+  }
+
+  return getUserProfileCompletionStatus(currentUserResult.user)
 }
 
 // Get current user's profile data

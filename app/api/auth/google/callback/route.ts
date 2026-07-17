@@ -50,6 +50,7 @@ function decodeState(rawState: string | null): GoogleState | null {
 }
 
 async function exchangeCodeForAccessToken(request: NextRequest, code: string) {
+  const redirectUri = getRedirectUri(request)
   const response = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -57,13 +58,19 @@ async function exchangeCodeForAccessToken(request: NextRequest, code: string) {
       code,
       client_id: GOOGLE_CLIENT_ID,
       client_secret: GOOGLE_CLIENT_SECRET,
-      redirect_uri: getRedirectUri(request),
+      redirect_uri: redirectUri,
       grant_type: "authorization_code",
     }),
   })
 
   if (!response.ok) {
-    throw new Error("Google token exchange failed")
+    const errorText = await response.text().catch(() => "")
+    console.error("Google token exchange failed", {
+      status: response.status,
+      redirectUri,
+      error: errorText,
+    })
+    throw new Error(`google_token_exchange_failed_${response.status}`)
   }
 
   const tokenPayload = await response.json()
@@ -100,6 +107,14 @@ export async function GET(request: NextRequest) {
     const nonceCookie = request.cookies.get("google_oauth_nonce")?.value
 
     if (!code || !state || !nonceCookie || state.nonce !== nonceCookie) {
+      console.error("Google OAuth state validation failed", {
+        hasCode: !!code,
+        hasState: !!state,
+        hasNonceCookie: !!nonceCookie,
+        nonceMatches: !!state && !!nonceCookie && state.nonce === nonceCookie,
+        callbackUrl: request.nextUrl.origin + request.nextUrl.pathname,
+        configuredRedirectUri: getRedirectUri(request),
+      })
       loginUrl.searchParams.set("error", "google_state_invalid")
       return NextResponse.redirect(loginUrl)
     }
@@ -126,6 +141,25 @@ export async function GET(request: NextRequest) {
       registerUrl.searchParams.set("lastName", googleUser.family_name || "")
       registerUrl.searchParams.set("error", "google_account_not_found")
       const response = NextResponse.redirect(registerUrl)
+      const registrationToken = await new SignJWT({
+        sub: googleUser.sub,
+        email,
+        firstName: googleUser.given_name || "",
+        lastName: googleUser.family_name || "",
+        role: state.role,
+      })
+        .setProtectedHeader({ alg: "HS256" })
+        .setIssuedAt()
+        .setExpirationTime("10m")
+        .sign(new TextEncoder().encode(JWT_SECRET))
+
+      response.cookies.set("google_registration", registrationToken, {
+        httpOnly: true,
+        sameSite: "lax",
+        secure: process.env.NODE_ENV === "production",
+        maxAge: 10 * 60,
+        path: "/",
+      })
       response.cookies.delete("google_oauth_nonce")
       return response
     }

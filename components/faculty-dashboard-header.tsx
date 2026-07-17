@@ -92,6 +92,38 @@ const FacultyDashboardHeader = React.memo(({ user }: FacultyDashboardHeaderProps
     }
   }, [user])
 
+  useEffect(() => {
+    let cancelled = false
+
+    async function enforceProfileCompletion() {
+      if (!pathname || !pathname.startsWith("/dashboard/faculty") || pathname.startsWith("/dashboard/faculty/profile")) {
+        return
+      }
+
+      try {
+        const res = await fetch("/api/profile/completion", { cache: "no-store" })
+        const result = await res.json()
+
+        if (!cancelled && res.ok && result.role === "faculty" && result.complete === false) {
+          const params = new URLSearchParams()
+          params.set("completeProfile", "1")
+          if (Array.isArray(result.missing) && result.missing.length > 0) {
+            params.set("missing", result.missing.slice(0, 6).join(", "))
+          }
+          router.replace(`/dashboard/faculty/profile?${params.toString()}`)
+        }
+      } catch (error) {
+        console.error("Failed to check faculty profile completion:", error)
+      }
+    }
+
+    enforceProfileCompletion()
+
+    return () => {
+      cancelled = true
+    }
+  }, [pathname, router])
+
   const isActive = (path: string) => {
     return pathname === path || pathname?.startsWith(`${path}/`)
   }

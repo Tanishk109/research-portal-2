@@ -49,8 +49,8 @@ export default function LoginPage() {
       google_not_configured: "Google sign-in is not configured yet.",
       google_state_invalid: "Google sign-in expired. Please try again.",
       google_email_unverified: "Google could not verify that email address.",
-      google_auth_failed: "Google sign-in failed. Please try again.",
-      google_account_not_found: "No portal account exists for that Google email. Please register first.",
+      google_auth_failed: "Google sign-in failed. Check the deployed Google redirect URI and try again.",
+      google_account_not_found: "This Google email is not registered in the portal yet. Complete registration first, then use Google sign-in.",
     }
 
     toast({

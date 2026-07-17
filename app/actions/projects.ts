@@ -6,6 +6,7 @@ import { getCurrentUser } from "./auth"
 import { revalidatePath } from "next/cache"
 import { cache } from "@/lib/cache"
 import { toObjectId, toPlainObject } from "@/lib/db"
+import { getUserProfileCompletionStatus } from "./profiles"
 
 // Types
 export type ProjectFormData = {
@@ -380,6 +381,14 @@ export async function createProject(data: ProjectFormData) {
       return { success: false, message: "Unauthorized" }
     }
 
+    const completion = await getUserProfileCompletionStatus(user)
+    if (!completion.complete) {
+      return {
+        success: false,
+        message: `Complete your faculty profile before creating projects. Missing: ${completion.missing.join(", ")}`,
+      }
+    }
+
     const userId = toObjectId(user.id)
     if (!userId) {
       return { success: false, message: "Invalid user ID" }
@@ -433,6 +442,14 @@ export async function updateProject(id: number | string, data: ProjectFormData) 
 
     if (user.role !== "faculty") {
       return { success: false, message: "Unauthorized" }
+    }
+
+    const completion = await getUserProfileCompletionStatus(user)
+    if (!completion.complete) {
+      return {
+        success: false,
+        message: `Complete your faculty profile before updating projects. Missing: ${completion.missing.join(", ")}`,
+      }
     }
 
     const userId = toObjectId(user.id)

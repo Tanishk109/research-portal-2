@@ -6,6 +6,7 @@ import { getCurrentUser } from "./auth"
 import { revalidatePath } from "next/cache"
 import { cache } from "@/lib/cache"
 import { toObjectId } from "@/lib/db"
+import { getUserProfileCompletionStatus } from "./profiles"
 
 // Types
 export type ApplicationFormData = {
@@ -27,6 +28,14 @@ export async function applyToProject(data: ApplicationFormData) {
 
     if (user.role !== "student") {
       return { success: false, message: "Unauthorized" }
+    }
+
+    const completion = await getUserProfileCompletionStatus(user)
+    if (!completion.complete) {
+      return {
+        success: false,
+        message: `Complete your student profile before applying. Missing: ${completion.missing.join(", ")}`,
+      }
     }
 
     const userId = toObjectId(user.id)

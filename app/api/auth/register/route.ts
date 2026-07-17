@@ -3,13 +3,40 @@ import { NextResponse } from "next/server"
 import { connectToMongoDB } from "@/lib/mongodb"
 import { User, FacultyProfile, StudentProfile, LoginActivity } from "@/lib/models"
 import { hashPassword } from "@/lib/db"
-import { SignJWT } from "jose"
+import { jwtVerify, SignJWT } from "jose"
 import { nanoid } from "nanoid"
 import { JWT_SECRET, JWT_EXPIRATION, COOKIE_SETTINGS } from "@/lib/env"
 import { cookies } from "next/headers"
+import { randomBytes } from "crypto"
 
 // Force dynamic rendering for this route (uses cookies)
 export const dynamic = 'force-dynamic'
+
+type GoogleRegistrationPayload = {
+  sub?: string
+  email?: string
+  firstName?: string
+  lastName?: string
+  role?: "faculty" | "student"
+}
+
+async function getGoogleRegistrationPayload() {
+  const cookieStore = await cookies()
+  const token = cookieStore.get("google_registration")?.value
+  if (!token) return null
+
+  try {
+    const { payload } = await jwtVerify(token, new TextEncoder().encode(JWT_SECRET))
+    const googlePayload = payload as GoogleRegistrationPayload
+    if (!googlePayload.sub || !googlePayload.email || (googlePayload.role !== "faculty" && googlePayload.role !== "student")) {
+      return null
+    }
+    return googlePayload
+  } catch (error) {
+    console.error("Invalid Google registration token:", error)
+    return null
+  }
+}
 
 // POST /api/auth/register - Register a new user
 export async function POST(request: NextRequest) {
@@ -17,6 +44,8 @@ export async function POST(request: NextRequest) {
     await connectToMongoDB()
     console.log("Registration request received")
     const body = await request.json()
+    const googleRegistration = await getGoogleRegistrationPayload()
+    const isGoogleRegistration = !!googleRegistration
 
     const {
       role,
@@ -39,23 +68,28 @@ export async function POST(request: NextRequest) {
       ipAddress,
     } = body
 
-    console.log(`Registration attempt for: ${email}, role: ${role}`)
-    const normalizedEmail = email.toLowerCase()
+    const effectiveRole = isGoogleRegistration ? googleRegistration.role : role
+    const effectiveEmail = isGoogleRegistration ? googleRegistration.email : email
+    const effectiveFirstName = isGoogleRegistration ? googleRegistration.firstName || firstName : firstName
+    const effectiveLastName = isGoogleRegistration ? googleRegistration.lastName || lastName : lastName
+
+    console.log(`Registration attempt for: ${effectiveEmail}, role: ${effectiveRole}`)
+    const normalizedEmail = String(effectiveEmail || "").toLowerCase()
 
     // Validate required fields
-    if (!role || !firstName || !lastName || !email || !password) {
+    if (!effectiveRole || !effectiveFirstName || !effectiveLastName || !effectiveEmail || (!isGoogleRegistration && !password)) {
       console.log("Missing required fields")
       return NextResponse.json(
         {
           success: false,
-          message: "All required fields must be provided",
+          message: isGoogleRegistration ? "Google account details are missing. Please restart Google sign-up." : "All required fields must be provided",
         },
         { status: 400 }
       )
     }
 
     // Validate role-specific fields
-    if (role === "faculty") {
+    if (effectiveRole === "faculty") {
       if (!facultyId || !department || !specialization || !dateOfJoining || !dateOfBirth) {
         console.log("Missing faculty-specific fields")
         return NextResponse.json(
@@ -66,7 +100,7 @@ export async function POST(request: NextRequest) {
           { status: 400 }
         )
       }
-    } else if (role === "student") {
+    } else if (effectiveRole === "student") {
       if (!registrationNumber || !department || !year || !cgpa) {
         console.log("Missing student-specific fields")
         return NextResponse.json(
@@ -78,7 +112,7 @@ export async function POST(request: NextRequest) {
         )
       }
     } else {
-      console.log(`Invalid role: ${role}`)
+      console.log(`Invalid role: ${effectiveRole}`)
       return NextResponse.json(
         {
           success: false,
@@ -95,7 +129,7 @@ export async function POST(request: NextRequest) {
     })
 
     if (existingUser) {
-      console.log(`Email already exists: ${email}`)
+      console.log(`Email already exists: ${normalizedEmail}`)
       return NextResponse.json(
         {
           success: false,
@@ -105,7 +139,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (role === "faculty") {
+    if (effectiveRole === "faculty") {
       const existingFacultyProfile = await FacultyProfile.findOne({ faculty_id: facultyId })
       if (existingFacultyProfile) {
         return NextResponse.json(
@@ -113,7 +147,7 @@ export async function POST(request: NextRequest) {
           { status: 400 }
         )
       }
-    } else if (role === "student") {
+    } else if (effectiveRole === "student") {
       const existingStudentProfile = await StudentProfile.findOne({ registration_number: registrationNumber })
       if (existingStudentProfile) {
         return NextResponse.json(
@@ -123,9 +157,8 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Hash password
     console.log("Hashing password...")
-    const hashedPassword = await hashPassword(password)
+    const hashedPassword = await hashPassword(isGoogleRegistration ? randomBytes(32).toString("base64url") : password)
 
     const session = await User.startSession()
     let user: any = null
@@ -136,11 +169,13 @@ export async function POST(request: NextRequest) {
         const users = await User.create(
           [
             {
-              role: role as "faculty" | "student",
-              first_name: firstName,
-              last_name: lastName,
+              role: effectiveRole as "faculty" | "student",
+              first_name: effectiveFirstName,
+              last_name: effectiveLastName,
               email: normalizedEmail,
               password_hash: hashedPassword,
+              google_id: googleRegistration?.sub,
+              auth_provider: isGoogleRegistration ? "google" : "credentials",
             },
           ],
           { session }
@@ -149,7 +184,7 @@ export async function POST(request: NextRequest) {
 
         console.log(`User created with ID: ${user._id}`)
 
-        if (role === "faculty") {
+        if (effectiveRole === "faculty") {
           console.log("Creating faculty profile...")
           await FacultyProfile.create(
             [
@@ -224,6 +259,7 @@ export async function POST(request: NextRequest) {
     console.log("Setting session cookie...")
     const cookieStore = await cookies()
     cookieStore.set("session", token, COOKIE_SETTINGS)
+    cookieStore.delete("google_registration")
 
     console.log(`Registration successful for user: ${user._id}`)
 

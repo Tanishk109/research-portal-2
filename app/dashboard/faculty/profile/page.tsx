@@ -2,6 +2,7 @@
 
 import type React from "react"
 import { useState, useEffect } from "react"
+import { useSearchParams } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -44,6 +45,7 @@ function readFileAsDataUrl(file: File) {
 }
 
 export default function FacultyProfilePage() {
+  const searchParams = useSearchParams()
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [isSavingPhoto, setIsSavingPhoto] = useState(false)
@@ -60,6 +62,8 @@ export default function FacultyProfilePage() {
     phone: "",
     bio: "",
   })
+  const mustCompleteProfile = searchParams?.get("completeProfile") === "1"
+  const missingFields = searchParams?.get("missing")
 
   useEffect(() => {
     loadProfile()
@@ -215,6 +219,18 @@ export default function FacultyProfilePage() {
               </Button>
             </div>
           </div>
+
+          {mustCompleteProfile && (
+            <Card className="border-amber-200 bg-amber-50 text-amber-950">
+              <CardHeader>
+                <CardTitle className="text-base">Complete your faculty profile</CardTitle>
+                <CardDescription className="text-amber-800">
+                  Faculty modules unlock after required profile details are saved.
+                  {missingFields ? ` Missing: ${missingFields}.` : ""}
+                </CardDescription>
+              </CardHeader>
+            </Card>
+          )}
 
         <Card className="faculty-panel-strong rounded-lg">
           <CardHeader>
