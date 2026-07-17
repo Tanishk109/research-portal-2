@@ -13,6 +13,12 @@ const protectedPaths = [
   "/api/applications",
   "/api/dashboard",
   "/api/login-activity",
+  "/api/db-test",
+  "/api/registration-test",
+  "/api/env-check",
+  "/api/check-jwt",
+  "/api/db-diagnostic",
+  "/debug",
 ]
 
 // Paths that are public (no authentication required)
@@ -24,10 +30,9 @@ const publicPaths = [
   "/api/auth/login",
   "/api/auth/register",
   "/api/auth/logout",
-  "/api/db-test",
-  "/api/registration-test",
+  "/api/auth/google/start",
+  "/api/auth/google/callback",
   "/api/health",
-  "/debug",
 ]
 
 // Role-based path restrictions

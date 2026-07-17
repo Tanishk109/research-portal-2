@@ -18,12 +18,9 @@ import { AlertCircle } from "lucide-react"
 export default function RegisterPage() {
   const searchParams = useSearchParams()
   const initialRole = searchParams?.get("role") === "faculty" ? "faculty" : "student"
-  const isGoogleSignup = searchParams?.get("error") === "google_account_not_found"
   const [role, setRole] = useState(initialRole)
-  const [fullName, setFullName] = useState(
-    [searchParams?.get("firstName"), searchParams?.get("lastName")].filter(Boolean).join(" "),
-  )
-  const [email, setEmail] = useState(searchParams?.get("email") || "")
+  const [fullName, setFullName] = useState("")
+  const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
 
   const [loading, setLoading] = useState(false)
@@ -40,16 +37,6 @@ export default function RegisterPage() {
       .then((data) => setIpAddress(data.ip))
       .catch((error) => console.error("Error fetching IP:", error))
   }, [])
-
-  useEffect(() => {
-    const error = searchParams?.get("error")
-    if (error === "google_account_not_found") {
-      toast({
-        title: "Complete registration",
-        description: "No portal account exists for that Google email yet. Confirm your role and name to continue.",
-      })
-    }
-  }, [searchParams, toast])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -82,9 +69,7 @@ export default function RegisterPage() {
         ipAddress,
       }
 
-      if (!isGoogleSignup) {
-        registrationData.password = password
-      }
+      registrationData.password = password
 
       console.log("Submitting registration data:", {
         ...registrationData,
@@ -146,11 +131,9 @@ export default function RegisterPage() {
       <AuthBackground />
       <Card className="w-full max-w-2xl z-10">
         <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold">{isGoogleSignup ? "Complete Google sign-up" : "Create an account"}</CardTitle>
+          <CardTitle className="text-2xl font-bold">Create an account</CardTitle>
           <CardDescription>
-            {isGoogleSignup
-              ? "Confirm the basics now. You can complete your profile after sign-up."
-              : "Create your account now and complete your profile after login."}
+            Create your account now and complete your profile after login.
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>
@@ -166,7 +149,7 @@ export default function RegisterPage() {
             {/* Role Selection */}
             <div className="space-y-2">
               <Label>I am a</Label>
-              <RadioGroup value={role} onValueChange={setRole} className="flex space-x-4" disabled={isGoogleSignup}>
+              <RadioGroup value={role} onValueChange={setRole} className="flex space-x-4">
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="student" id="student" />
                   <Label htmlFor="student">Student</Label>
@@ -191,31 +174,27 @@ export default function RegisterPage() {
 
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} disabled={isGoogleSignup} required />
+              <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
             </div>
 
-            {!isGoogleSignup && (
-              <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                />
-              </div>
-            )}
+            <div className="space-y-2">
+              <Label htmlFor="password">Password</Label>
+              <Input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
+            </div>
           </CardContent>
           <CardFooter className="flex flex-col space-y-4">
             <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Creating account..." : isGoogleSignup ? "Create Google Account" : "Register"}
+              {loading ? "Creating account..." : "Register"}
             </Button>
-            {!isGoogleSignup && (
-              <Button type="button" variant="outline" className="w-full" onClick={handleGoogleSignUp} disabled={loading}>
-                Continue with Google
-              </Button>
-            )}
+            <Button type="button" variant="outline" className="w-full" onClick={handleGoogleSignUp} disabled={loading}>
+              Continue with Google
+            </Button>
             <div className="text-center text-sm">
               Already have an account?{" "}
               <Link href="/login" className="text-primary hover:underline">

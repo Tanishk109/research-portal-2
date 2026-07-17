@@ -31,7 +31,7 @@ export async function GET() {
       NEXT_PUBLIC_APP_URL: NEXT_PUBLIC_APP_URL || "not configured",
       API_URL: API_URL || "same origin",
       GOOGLE_CLIENT_ID: GOOGLE_CLIENT_ID ? `${GOOGLE_CLIENT_ID.slice(0, 8)}...` : "Not configured",
-      GOOGLE_REDIRECT_URI: GOOGLE_REDIRECT_URI || "Default callback URL",
+      GOOGLE_REDIRECT_URI: GOOGLE_REDIRECT_URI || "Not configured",
       IS_GOOGLE_AUTH_CONFIGURED,
     },
   })

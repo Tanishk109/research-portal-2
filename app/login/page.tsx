@@ -46,18 +46,16 @@ export default function LoginPage() {
     if (!authError) return
 
     const messages: Record<string, string> = {
-      google_not_configured: "Google sign-in is not configured yet.",
-      google_redirect_mismatch: "Google sign-in is configured for a different domain. Use one deployment domain for start, callback, and dashboard.",
-      google_state_invalid: "Google sign-in expired. Please try again.",
-      google_email_unverified: "Google could not verify that email address.",
-      google_invalid_grant: "Google rejected this sign-in code. Start again from the Google button, and confirm the Google redirect URI exactly matches this deployment.",
-      google_auth_failed: "Google sign-in failed. Check the deployed Google redirect URI and try again.",
-      google_account_not_found: "This Google email is not registered in the portal yet. Complete registration first, then use Google sign-in.",
+      google_not_configured: "Google authentication is not configured.",
+      google_access_denied: "Google authentication was cancelled.",
+      google_state_invalid: "The Google login request expired. Please try again.",
+      google_email_unverified: "Google could not verify this email address.",
+      google_auth_failed: "Google authentication failed. Please try again.",
     }
 
     toast({
       title: "Google sign-in unavailable",
-      description: messages[authError] || "Google sign-in could not be completed.",
+      description: messages[authError] || "Google authentication could not be completed.",
       variant: "destructive",
     })
   }, [authError])
@@ -147,32 +145,13 @@ export default function LoginPage() {
 
   const handleGoogleSignIn = (role: "faculty" | "student") => {
     const params = new URLSearchParams({ role })
+
     if (redirectTo.startsWith("/") && !redirectTo.startsWith("//")) {
       params.set("redirect", redirectTo)
     }
+
     window.location.href = `/api/auth/google/start?${params.toString()}`
   }
-
-  const GoogleIcon = () => (
-    <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">
-      <path
-        fill="#4285F4"
-        d="M21.6 12.2c0-.7-.1-1.4-.2-2H12v3.8h5.4c-.2 1.2-.9 2.3-2 3v2.5h3.2c1.9-1.7 3-4.3 3-7.3z"
-      />
-      <path
-        fill="#34A853"
-        d="M12 22c2.7 0 5-.9 6.6-2.5L15.4 17c-.9.6-2 .9-3.4.9-2.6 0-4.8-1.8-5.6-4.1H3.1v2.6C4.7 19.7 8.1 22 12 22z"
-      />
-      <path
-        fill="#FBBC05"
-        d="M6.4 13.8c-.2-.6-.3-1.2-.3-1.8s.1-1.2.3-1.8V7.6H3.1C2.4 8.9 2 10.4 2 12s.4 3.1 1.1 4.4l3.3-2.6z"
-      />
-      <path
-        fill="#EA4335"
-        d="M12 6.1c1.5 0 2.8.5 3.8 1.5l2.8-2.8C16.9 3.1 14.7 2 12 2 8.1 2 4.7 4.3 3.1 7.6l3.3 2.6C7.2 7.9 9.4 6.1 12 6.1z"
-      />
-    </svg>
-  )
 
   return (
     <>
@@ -254,34 +233,33 @@ export default function LoginPage() {
                       </div>
                     </CardContent>
                     <CardFooter>
-                      <Button
-                        type="submit"
-                        className="w-full bg-gradient-to-r from-secondary-500 to-primary-500 hover:from-secondary-600 hover:to-primary-600 text-white"
-                        disabled={isLoading}
-                      >
-                        {isLoading ? (
-                          <div className="flex items-center gap-2">
-                            <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
-                            <span>Signing in...</span>
-                          </div>
-                        ) : (
-                          "Sign in"
-                        )}
-                      </Button>
+                      <div className="flex w-full flex-col gap-2">
+                        <Button
+                          type="submit"
+                          className="w-full bg-gradient-to-r from-secondary-500 to-primary-500 hover:from-secondary-600 hover:to-primary-600 text-white"
+                          disabled={isLoading}
+                        >
+                          {isLoading ? (
+                            <div className="flex items-center gap-2">
+                              <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
+                              <span>Signing in...</span>
+                            </div>
+                          ) : (
+                            "Sign in"
+                          )}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="w-full"
+                          onClick={() => handleGoogleSignIn("faculty")}
+                          disabled={isLoading}
+                        >
+                          Continue with Google
+                        </Button>
+                      </div>
                     </CardFooter>
                   </form>
-                  <CardFooter className="pt-0">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="w-full gap-2 bg-white/70"
-                      onClick={() => handleGoogleSignIn("faculty")}
-                      disabled={isLoading}
-                    >
-                      <GoogleIcon />
-                      Continue with Google
-                    </Button>
-                  </CardFooter>
                 </Card>
               </TabsContent>
               <TabsContent value="student">
@@ -331,34 +309,33 @@ export default function LoginPage() {
                       </div>
                     </CardContent>
                     <CardFooter>
-                      <Button
-                        type="submit"
-                        className="w-full bg-gradient-to-r from-secondary-500 to-primary-500 hover:from-secondary-600 hover:to-primary-600 text-white"
-                        disabled={isLoading}
-                      >
-                        {isLoading ? (
-                          <div className="flex items-center gap-2">
-                            <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
-                            <span>Signing in...</span>
-                          </div>
-                        ) : (
-                          "Sign in"
-                        )}
-                      </Button>
+                      <div className="flex w-full flex-col gap-2">
+                        <Button
+                          type="submit"
+                          className="w-full bg-gradient-to-r from-secondary-500 to-primary-500 hover:from-secondary-600 hover:to-primary-600 text-white"
+                          disabled={isLoading}
+                        >
+                          {isLoading ? (
+                            <div className="flex items-center gap-2">
+                              <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
+                              <span>Signing in...</span>
+                            </div>
+                          ) : (
+                            "Sign in"
+                          )}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="w-full"
+                          onClick={() => handleGoogleSignIn("student")}
+                          disabled={isLoading}
+                        >
+                          Continue with Google
+                        </Button>
+                      </div>
                     </CardFooter>
                   </form>
-                  <CardFooter className="pt-0">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="w-full gap-2 bg-white/70"
-                      onClick={() => handleGoogleSignIn("student")}
-                      disabled={isLoading}
-                    >
-                      <GoogleIcon />
-                      Continue with Google
-                    </Button>
-                  </CardFooter>
                 </Card>
               </TabsContent>
             </Tabs>
