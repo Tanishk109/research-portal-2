@@ -8,7 +8,7 @@ import { createVerificationUrl, sendVerificationEmail } from "@/lib/email"
 
 export const dynamic = "force-dynamic"
 
-const VERIFICATION_TOKEN_TTL_MS = 24 * 60 * 60 * 1000
+const VERIFICATION_TOKEN_TTL_MS = 30 * 60 * 1000
 
 function normalizeEmail(email: unknown) {
   return String(email || "").trim().toLowerCase()
@@ -99,13 +99,13 @@ export async function POST(request: NextRequest) {
 
     await sendVerificationEmail({
       to: email,
-      name: `${firstName} ${lastName}`,
+      firstName,
       verificationUrl: createVerificationUrl(token),
     })
 
     return NextResponse.json({
       success: true,
-      message: "A verification link has been sent to your email. Please verify your email to finish creating your account.",
+      message: "Verification email sent. Check your inbox to complete registration.",
       data: { email },
     })
   } catch (error) {

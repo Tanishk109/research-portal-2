@@ -264,12 +264,9 @@ Open [http://localhost:3000](http://localhost:3000).
 | `JWT_EXPIRATION` | No | Token lifetime; defaults to `7d` |
 | `NEXT_PUBLIC_APP_URL` | Production | Canonical public URL of the application |
 | `NEXT_PUBLIC_API_URL` | Usually no | Only needed when the API is hosted separately |
-| `SMTP_HOST` | Yes | SMTP server used for verification emails |
-| `SMTP_PORT` | Yes | SMTP port, usually `587` for STARTTLS |
-| `SMTP_SECURE` | Yes | Use `true` for implicit TLS ports such as `465`; otherwise `false` |
-| `SMTP_USER` | Yes | SMTP login email or username |
-| `SMTP_PASSWORD` | Yes | SMTP password or provider app password |
 | `EMAIL_FROM` | Yes | Sender address shown on verification emails |
+| `EMAIL_PROVIDER` | Yes | Must be `resend` |
+| `RESEND_API_KEY` | Yes | Resend API key used for HTTPS email delivery |
 
 ## Authentication and Access Control
 
@@ -322,13 +319,12 @@ JWT_SECRET=your_production_jwt_secret
 JWT_EXPIRATION=7d
 NEXT_PUBLIC_APP_URL=https://research-portal-2-tvgq.onrender.com
 NEXT_PUBLIC_API_URL=
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_SECURE=false
-SMTP_USER=your_email@gmail.com
-SMTP_PASSWORD=your_gmail_app_password
-EMAIL_FROM=your_email@gmail.com
+EMAIL_PROVIDER=resend
+RESEND_API_KEY=re_xxxxxxxxxxxxxxxxxxxxxxxxx
+EMAIL_FROM=MUJ Research Portal <verified-sender@yourdomain.com>
 ```
+
+Render free services block outbound SMTP ports, so the application sends verification email through Resend's HTTPS API. For public registration, verify your own sending domain in Resend; `onboarding@resend.dev` is only suitable for testing with the email address attached to your Resend account.
 
 Redeploy the service after modifying environment variables.
 

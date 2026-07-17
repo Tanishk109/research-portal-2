@@ -8,7 +8,7 @@ import { createVerificationUrl, sendVerificationEmail } from "@/lib/email"
 export const dynamic = "force-dynamic"
 
 const COOLDOWN_MS = 60 * 1000
-const VERIFICATION_TOKEN_TTL_MS = 24 * 60 * 60 * 1000
+const VERIFICATION_TOKEN_TTL_MS = 30 * 60 * 1000
 const GENERIC_MESSAGE = "If a pending registration exists for this email, a new verification link will be sent."
 
 function createVerificationToken() {
@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
 
     await sendVerificationEmail({
       to: pending.email,
-      name: `${pending.first_name} ${pending.last_name}`,
+      firstName: pending.first_name,
       verificationUrl: createVerificationUrl(token),
     })
 

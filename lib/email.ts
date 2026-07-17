@@ -1,110 +1,138 @@
-import nodemailer from "nodemailer"
-import dns from "dns"
-import {
-  EMAIL_FROM,
-  IS_SMTP_CONFIGURED,
-  NEXT_PUBLIC_APP_URL,
-  SMTP_HOST,
-  SMTP_PASSWORD,
-  SMTP_PORT,
-  SMTP_SECURE,
-  SMTP_USER,
-} from "@/lib/env"
+import { EMAIL_FROM, EMAIL_PROVIDER, NEXT_PUBLIC_APP_URL, RESEND_API_KEY } from "@/lib/env"
 
 type VerificationEmailInput = {
   to: string
-  name: string
+  firstName: string
   verificationUrl: string
 }
 
-let dnsConfigured = false
-
-export function ensureEmailConfigured() {
-  if (!IS_SMTP_CONFIGURED) {
-    throw new Error("Email verification is not configured. Set SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, and EMAIL_FROM.")
-  }
-}
-
-function preferIpv4() {
-  if (dnsConfigured) return
-
-  try {
-    dns.setDefaultResultOrder("ipv4first")
-  } catch {
-    // Older Node runtimes may not support this setting; the SMTP socket still asks for IPv4 below.
+function requireEnvironmentVariable(name: string, value: string): string {
+  if (!value?.trim()) {
+    throw new Error(`${name} environment variable is required`)
   }
 
-  dnsConfigured = true
-}
-
-function createTransport() {
-  ensureEmailConfigured()
-  preferIpv4()
-
-  return nodemailer.createTransport({
-    host: SMTP_HOST,
-    port: SMTP_PORT,
-    secure: SMTP_SECURE,
-    family: 4,
-    connectionTimeout: 10_000,
-    greetingTimeout: 10_000,
-    socketTimeout: 20_000,
-    auth: {
-      user: SMTP_USER,
-      pass: SMTP_PASSWORD,
-    },
-  } as any)
+  return value.trim()
 }
 
 export function createVerificationUrl(token: string) {
-  if (!NEXT_PUBLIC_APP_URL) {
-    throw new Error("NEXT_PUBLIC_APP_URL is required to create verification links.")
-  }
-
-  const url = new URL("/verify-email", NEXT_PUBLIC_APP_URL)
+  const appUrl = requireEnvironmentVariable("NEXT_PUBLIC_APP_URL", NEXT_PUBLIC_APP_URL)
+  const url = new URL("/verify-email", appUrl)
   url.searchParams.set("token", token)
   return url.toString()
 }
 
-function escapeHtml(value: string) {
+function escapeHtml(value: string): string {
   return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;")
 }
 
-export async function sendVerificationEmail({ to, name, verificationUrl }: VerificationEmailInput) {
-  const transporter = createTransport()
-  const from = EMAIL_FROM.includes("<") ? EMAIL_FROM : `"MUJ Research Portal" <${EMAIL_FROM}>`
-  const safeName = escapeHtml(name)
-  const safeVerificationUrl = escapeHtml(verificationUrl)
+function parseResendError(errorBody: string) {
+  try {
+    const parsed = JSON.parse(errorBody)
+    return parsed?.message || parsed?.error || errorBody
+  } catch {
+    return errorBody
+  }
+}
 
-  await transporter.sendMail({
-    from,
-    to,
-    subject: "Verify your MUJ Research Portal account",
-    text: [
-      `Hi ${name},`,
-      "",
-      "Please verify your email address to finish creating your MUJ Research Portal account:",
-      verificationUrl,
-      "",
-      "This link expires in 24 hours. If you did not request this account, you can ignore this email.",
-    ].join("\n"),
-    html: `
-      <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #111827;">
-        <h2 style="margin: 0 0 12px;">Verify your email address</h2>
-        <p>Hi ${safeName},</p>
-        <p>Please verify your email address to finish creating your MUJ Research Portal account.</p>
-        <p>
-          <a href="${safeVerificationUrl}" style="display: inline-block; padding: 12px 18px; background: #2563eb; color: #ffffff; text-decoration: none; border-radius: 8px;">
-            Verify email
-          </a>
-        </p>
-        <p style="font-size: 14px; color: #4b5563;">This link expires in 24 hours. If you did not request this account, you can ignore this email.</p>
-      </div>
-    `,
+function parseJsonBody(value: string) {
+  if (!value) return null
+
+  try {
+    return JSON.parse(value)
+  } catch {
+    return null
+  }
+}
+
+export async function sendVerificationEmail({
+  to,
+  firstName,
+  verificationUrl,
+}: VerificationEmailInput): Promise<string> {
+  const provider = EMAIL_PROVIDER || process.env.EMAIL_PROVIDER?.trim().toLowerCase()
+
+  if (provider !== "resend") {
+    throw new Error(`Unsupported email provider: ${provider || "not configured"}`)
+  }
+
+  const apiKey = requireEnvironmentVariable("RESEND_API_KEY", RESEND_API_KEY)
+  const from = requireEnvironmentVariable("EMAIL_FROM", EMAIL_FROM)
+
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from,
+      to: [to],
+      subject: "Verify your MUJ Research Portal account",
+      text: [
+        `Hello ${firstName},`,
+        "",
+        "Verify your email address to create your Research Portal account:",
+        verificationUrl,
+        "",
+        "This link expires in 30 minutes.",
+        "If you did not request this account, ignore this email.",
+      ].join("\n"),
+      html: `
+        <div style="font-family:Arial,sans-serif;max-width:600px;margin:auto">
+          <h2>Verify your email address</h2>
+
+          <p>Hello ${escapeHtml(firstName)},</p>
+
+          <p>
+            Confirm your email address to create your
+            MUJ Research Portal account.
+          </p>
+
+          <p style="margin:30px 0">
+            <a
+              href="${escapeHtml(verificationUrl)}"
+              style="
+                background:#2563eb;
+                color:#ffffff;
+                padding:12px 20px;
+                border-radius:8px;
+                text-decoration:none;
+                font-weight:600;
+              "
+            >
+              Verify email
+            </a>
+          </p>
+
+          <p style="color:#64748b;font-size:14px">
+            This link expires in 30 minutes.
+          </p>
+        </div>
+      `,
+    }),
   })
+
+  const responseBody = await response.text()
+  const result = parseJsonBody(responseBody)
+
+  if (!response.ok) {
+    const message = parseResendError(responseBody)
+    console.error("Resend email error:", {
+      status: response.status,
+      message,
+    })
+    throw new Error(`Email delivery failed: ${message}`)
+  }
+
+  if (!result?.id) {
+    throw new Error("Resend did not return an email ID")
+  }
+
+  console.log("Verification email accepted by Resend:", result.id)
+  return result.id
 }

@@ -25,15 +25,11 @@ export const NEXT_PUBLIC_APP_URL = normalizeUrl(
 export const NEXT_PUBLIC_API_URL = normalizeUrl(process.env.NEXT_PUBLIC_API_URL || "")
 export const API_URL = normalizeUrl(NEXT_PUBLIC_API_URL || NEXT_PUBLIC_APP_URL)
 
-// Email verification configuration
-export const SMTP_HOST = normalizeEnv(process.env.SMTP_HOST)
-export const SMTP_PORT = Number.parseInt(normalizeEnv(process.env.SMTP_PORT) || "587", 10)
-export const SMTP_SECURE = normalizeEnv(process.env.SMTP_SECURE).toLowerCase() === "true"
-export const SMTP_USER = normalizeEnv(process.env.SMTP_USER)
-export const SMTP_PASSWORD = normalizeEnv(process.env.SMTP_PASSWORD)
-export const EMAIL_FROM = normalizeEnv(process.env.EMAIL_FROM) || SMTP_USER
-export const IS_SMTP_CONFIGURED =
-  Boolean(SMTP_HOST) && Boolean(SMTP_PORT) && Boolean(SMTP_USER) && Boolean(SMTP_PASSWORD) && Boolean(EMAIL_FROM)
+// Email verification configuration. Render free services block SMTP ports, so email is sent over HTTPS.
+export const EMAIL_PROVIDER = normalizeEnv(process.env.EMAIL_PROVIDER).toLowerCase()
+export const RESEND_API_KEY = normalizeEnv(process.env.RESEND_API_KEY)
+export const EMAIL_FROM = normalizeEnv(process.env.EMAIL_FROM)
+export const IS_RESEND_CONFIGURED = Boolean(RESEND_API_KEY) && Boolean(EMAIL_FROM)
 
 if (process.env.NODE_ENV === "production" && !JWT_SECRET) {
   throw new Error("JWT_SECRET is required in production")

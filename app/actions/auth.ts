@@ -11,7 +11,7 @@ import { nanoid } from "nanoid"
 import { JWT_SECRET, COOKIE_SETTINGS, JWT_EXPIRATION } from "@/lib/env"
 import { createVerificationUrl, sendVerificationEmail } from "@/lib/email"
 
-const VERIFICATION_TOKEN_TTL_MS = 24 * 60 * 60 * 1000
+const VERIFICATION_TOKEN_TTL_MS = 30 * 60 * 1000
 
 // Get user agent details
 function getUserAgentDetails(userAgent: string) {
@@ -178,13 +178,13 @@ export async function register(formData: FormData) {
 
     await sendVerificationEmail({
       to: email,
-      name: `${firstName} ${lastName}`,
+      firstName,
       verificationUrl: createVerificationUrl(verificationToken),
     })
 
     return {
       success: true,
-      message: "A verification link has been sent to your email. Please verify your email to finish creating your account.",
+      message: "Verification email sent. Check your inbox to complete registration.",
       data: { email },
     }
   } catch (error) {

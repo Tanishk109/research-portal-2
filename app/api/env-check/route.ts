@@ -6,12 +6,10 @@ import {
   IS_DB_CONFIGURED,
   API_URL,
   EMAIL_FROM,
-  IS_SMTP_CONFIGURED,
+  EMAIL_PROVIDER,
+  IS_RESEND_CONFIGURED,
   NEXT_PUBLIC_APP_URL,
-  SMTP_HOST,
-  SMTP_PORT,
-  SMTP_SECURE,
-  SMTP_USER,
+  RESEND_API_KEY,
 } from "@/lib/env"
 
 export async function GET() {
@@ -33,12 +31,10 @@ export async function GET() {
       IS_DB_CONFIGURED: IS_DB_CONFIGURED,
       NEXT_PUBLIC_APP_URL: NEXT_PUBLIC_APP_URL || "not configured",
       API_URL: API_URL || "same origin",
-      SMTP_HOST: SMTP_HOST || "Not configured",
-      SMTP_PORT,
-      SMTP_SECURE,
-      SMTP_USER: SMTP_USER ? `${SMTP_USER.slice(0, 3)}...` : "Not configured",
       EMAIL_FROM: EMAIL_FROM || "Not configured",
-      IS_SMTP_CONFIGURED,
+      EMAIL_PROVIDER: EMAIL_PROVIDER || "Not configured",
+      RESEND_API_KEY: RESEND_API_KEY ? `${RESEND_API_KEY.slice(0, 6)}...` : "Not configured",
+      IS_RESEND_CONFIGURED,
     },
   })
 }
