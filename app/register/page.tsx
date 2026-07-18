@@ -18,7 +18,7 @@ import { AlertCircle, CheckCircle2, Mail } from "lucide-react"
 export default function RegisterPage() {
   const searchParams = useSearchParams()
   const initialRole = searchParams?.get("role") === "faculty" ? "faculty" : "student"
-  const [role, setRole] = useState(initialRole)
+  const [role, setRole] = useState<"faculty" | "student">(initialRole)
   const [fullName, setFullName] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -39,6 +39,10 @@ export default function RegisterPage() {
       .catch((error) => console.error("Error fetching IP:", error))
   }, [])
 
+  useEffect(() => {
+    setRole(searchParams?.get("role") === "faculty" ? "faculty" : "student")
+  }, [searchParams])
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError("")
@@ -47,12 +51,12 @@ export default function RegisterPage() {
     const [firstName, ...lastNameParts] = trimmedName.split(/\s+/)
     const lastName = lastNameParts.join(" ")
 
-    if (!firstName || !lastName) {
+    if (!firstName) {
       setError("Please enter your full name.")
       toast({
         variant: "destructive",
-        title: "Full name required",
-        description: "Please enter both first and last name.",
+        title: "Name required",
+        description: "Please enter your name.",
       })
       return
     }
@@ -166,7 +170,7 @@ export default function RegisterPage() {
             </div>
             <CardTitle className="text-2xl font-bold">Check your inbox</CardTitle>
             <CardDescription>
-              We sent a verification link to {verificationEmail}. Your account will be created after you verify this email address.
+              We sent a verification link to {verificationEmail}. Your {role} account will be created after you verify this email address.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -221,7 +225,7 @@ export default function RegisterPage() {
             {/* Role Selection */}
             <div className="space-y-2">
               <Label>I am a</Label>
-              <RadioGroup value={role} onValueChange={setRole} className="flex space-x-4">
+              <RadioGroup value={role} onValueChange={(value) => setRole(value === "faculty" ? "faculty" : "student")} className="flex space-x-4">
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="student" id="student" />
                   <Label htmlFor="student">Student</Label>

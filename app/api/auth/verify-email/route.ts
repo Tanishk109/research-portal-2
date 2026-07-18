@@ -19,6 +19,10 @@ function getPendingProfileValue(kind: "faculty" | "student", userId: unknown) {
   return `${PENDING_PROFILE_PREFIX}${kind}_${String(userId)}`
 }
 
+function escapeRegex(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+}
+
 export async function POST(request: NextRequest) {
   try {
     await connectToMongoDB()
@@ -44,19 +48,29 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    const existingUser = await User.findOne({
+      email: { $regex: new RegExp(`^${escapeRegex(pending.email)}$`, "i") },
+    }).lean()
+
+    if (existingUser) {
+      await PendingRegistration.deleteMany({
+        email: { $regex: new RegExp(`^${escapeRegex(pending.email)}$`, "i") },
+      })
+
+      return NextResponse.json(
+        {
+          success: false,
+          message: "This email is already linked to an existing account. Please login instead.",
+        },
+        { status: 409 },
+      )
+    }
+
     const session = await User.startSession()
     let user: any = null
 
     try {
       await session.withTransaction(async () => {
-        const existingUser = await User.findOne({ email: pending.email }).session(session)
-
-        if (existingUser) {
-          user = existingUser
-          await PendingRegistration.deleteOne({ _id: pending._id }).session(session)
-          return
-        }
-
         const users = await User.create(
           [
             {
@@ -130,7 +144,7 @@ export async function POST(request: NextRequest) {
       id: user._id.toString(),
       role: user.role,
       email: user.email,
-      name: `${user.first_name} ${user.last_name}`,
+      name: `${user.first_name} ${user.last_name || ""}`.trim(),
       profilePictureUrl: user.profile_picture_url || null,
     })
       .setProtectedHeader({ alg: "HS256" })
@@ -149,10 +163,10 @@ export async function POST(request: NextRequest) {
           id: user._id.toString(),
           role: user.role,
           firstName: user.first_name,
-          lastName: user.last_name,
+          lastName: user.last_name || "",
           email: user.email,
           profilePictureUrl: user.profile_picture_url || null,
-          name: `${user.first_name} ${user.last_name}`,
+          name: `${user.first_name} ${user.last_name || ""}`.trim(),
         },
       },
     })

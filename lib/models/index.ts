@@ -18,8 +18,8 @@ const UserSchema = new Schema<IUser>(
   {
     role: { type: String, enum: ["faculty", "student"], required: true, index: true },
     first_name: { type: String, required: true, maxlength: 100 },
-    last_name: { type: String, required: true, maxlength: 100 },
-    email: { type: String, required: true, unique: true, index: true, maxlength: 255 },
+    last_name: { type: String, maxlength: 100, default: "" },
+    email: { type: String, required: true, unique: true, index: true, maxlength: 255, lowercase: true, trim: true },
     password_hash: { type: String, required: true },
     email_verified_at: { type: Date },
     profile_picture_url: { type: String },
@@ -50,8 +50,8 @@ const PendingRegistrationSchema = new Schema<IPendingRegistration>(
   {
     role: { type: String, enum: ["faculty", "student"], required: true, index: true },
     first_name: { type: String, required: true, maxlength: 100 },
-    last_name: { type: String, required: true, maxlength: 100 },
-    email: { type: String, required: true, unique: true, index: true, maxlength: 255 },
+    last_name: { type: String, maxlength: 100, default: "" },
+    email: { type: String, required: true, unique: true, index: true, maxlength: 255, lowercase: true, trim: true },
     password_hash: { type: String, required: true },
     verification_token_hash: { type: String, required: true, unique: true, index: true },
     expires_at: { type: Date, required: true },

@@ -132,7 +132,7 @@ export async function register(formData: FormData) {
     const userAgent = (formData.get("userAgent") as string) || "Unknown"
     const ipAddress = (formData.get("ipAddress") as string) || "Unknown"
 
-    if (!role || !firstName || !lastName || !email || !password) {
+    if (!role || !firstName || !email || !password) {
       return { success: false, message: "Name, role, email, and password are required." }
     }
 
@@ -147,7 +147,15 @@ export async function register(formData: FormData) {
     const existingUser = await User.findOne({ email })
 
     if (existingUser) {
-      return { success: false, message: "Email already in use" }
+      await PendingRegistration.deleteMany({ email })
+
+      return {
+        success: false,
+        message:
+          existingUser.role === role
+            ? "Email already in use"
+            : `This email is already registered as a ${existingUser.role}. Use a different email for a ${role} account.`,
+      }
     }
 
     const verificationToken = crypto.randomBytes(32).toString("base64url")

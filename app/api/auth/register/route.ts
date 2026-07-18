@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
     const userAgent = String(body.userAgent || "unknown")
     const ipAddress = String(body.ipAddress || "unknown")
 
-    if ((role !== "faculty" && role !== "student") || !firstName || !lastName || !email || !password) {
+    if ((role !== "faculty" && role !== "student") || !firstName || !email || !password) {
       return NextResponse.json(
         {
           success: false,
@@ -62,10 +62,17 @@ export async function POST(request: NextRequest) {
     }).lean()
 
     if (existingUser) {
+      await PendingRegistration.deleteMany({
+        email: { $regex: new RegExp(`^${escapeRegex(email)}$`, "i") },
+      })
+
       return NextResponse.json(
         {
           success: false,
-          message: "Email address is already registered.",
+          message:
+            existingUser.role === role
+              ? "Email address is already registered."
+              : `This email is already registered as a ${existingUser.role}. Use a different email for a ${role} account.`,
         },
         { status: 400 },
       )
@@ -102,6 +109,8 @@ export async function POST(request: NextRequest) {
       firstName,
       verificationUrl: createVerificationUrl(token),
     })
+
+    console.log("Verification email requested:", { role, email })
 
     return NextResponse.json({
       success: true,
