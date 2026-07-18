@@ -37,7 +37,7 @@ export const GMAIL_SENDER_EMAIL = normalizeEnv(process.env.GMAIL_SENDER_EMAIL) |
 export const IS_GMAIL_CONFIGURED =
   Boolean(GMAIL_CLIENT_ID) && Boolean(GMAIL_CLIENT_SECRET) && Boolean(GMAIL_REFRESH_TOKEN) && Boolean(GMAIL_SENDER_EMAIL)
 
-if (process.env.NODE_ENV === "production" && !JWT_SECRET) {
+if (typeof window === "undefined" && process.env.NODE_ENV === "production" && !JWT_SECRET) {
   throw new Error("JWT_SECRET is required in production")
 }
 
